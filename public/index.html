@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0e1116">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pocket Desktop">
+<meta name="format-detection" content="telephone=no">
+<title>Pocket Desktop</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" sizes="32x32" href="/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ───────────────────────── setup (first run) ───────────────────────── -->
+  <section id="screen-setup" class="screen center" hidden>
+    <div class="brand">
+      <img src="/icons/icon-192.png" alt="" class="brand-logo" width="72" height="72">
+      <h1>Pocket&nbsp;Desktop</h1>
+      <p class="muted">Set a PIN to protect remote access to this PC.</p>
+    </div>
+    <form id="setup-form" class="card stack" autocomplete="off">
+      <label class="field">
+        <span>Name for this PC</span>
+        <input id="setup-name" type="text" maxlength="40" placeholder="My PC" autocomplete="off">
+      </label>
+      <label class="field">
+        <span>Choose a PIN (4–10 digits)</span>
+        <input id="setup-pin" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="10" placeholder="••••" autocomplete="new-password">
+      </label>
+      <label class="field">
+        <span>Repeat PIN</span>
+        <input id="setup-pin2" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="10" placeholder="••••" autocomplete="new-password">
+      </label>
+      <button type="submit" class="btn primary big">Save PIN &amp; continue</button>
+      <p class="hint muted" id="setup-hint">You will type this PIN when connecting from your phone.</p>
+    </form>
+  </section>
+
+  <!-- ───────────────────────── login ───────────────────────── -->
+  <section id="screen-login" class="screen center" hidden>
+    <div class="brand">
+      <img src="/icons/icon-192.png" alt="" class="brand-logo" width="64" height="64">
+      <h1 id="login-title">Enter PIN</h1>
+      <p class="muted" id="login-sub">to control <span id="login-host">this PC</span></p>
+    </div>
+    <div class="pindots" id="pin-dots" aria-live="polite"></div>
+    <div class="pinpad" id="pinpad">
+      <button class="key" data-key="1">1</button>
+      <button class="key" data-key="2">2</button>
+      <button class="key" data-key="3">3</button>
+      <button class="key" data-key="4">4</button>
+      <button class="key" data-key="5">5</button>
+      <button class="key" data-key="6">6</button>
+      <button class="key" data-key="7">7</button>
+      <button class="key" data-key="8">8</button>
+      <button class="key" data-key="9">9</button>
+      <button class="key ghost" data-key="clear" aria-label="Clear">Clear</button>
+      <button class="key" data-key="0">0</button>
+      <button class="key ghost" data-key="back" aria-label="Backspace">⌫</button>
+    </div>
+    <p class="hint muted" id="login-hint">Forgot it? Run <code>node server.js --set-pin 1234</code> on your PC.</p>
+  </section>
+
+  <!-- ───────────────────────── home / connect ───────────────────────── -->
+  <section id="screen-home" class="screen" hidden>
+    <header class="topbar">
+      <div class="topbar-title">
+        <span class="dot" id="home-dot"></span>
+        <div>
+          <strong id="home-name">Pocket Desktop</strong>
+          <small class="muted" id="home-sub">checking…</small>
+        </div>
+      </div>
+      <button class="icon-btn" id="btn-home-refresh" title="Refresh status" aria-label="Refresh status">
+        <svg viewBox="0 0 24 24" class="ico"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6"/></svg>
+      </button>
+    </header>
+
+    <main class="scroll">
+      <section class="card warnbar" id="version-banner" hidden>
+        <div>
+          <strong>Update not active</strong>
+          <p class="muted small" id="version-text"></p>
+        </div>
+        <button class="btn small" id="btn-version-restart">Restart server</button>
+      </section>
+
+      <section class="card hero">
+        <div class="hero-head">
+          <div>
+            <div class="hero-label muted">Desktop session</div>
+            <div class="hero-value" id="hero-session">—</div>
+          </div>
+          <div class="pill" id="hero-vnc">offline</div>
+        </div>
+        <div class="statgrid">
+          <div class="stat"><span class="muted">CPU</span><b id="stat-cpu">—</b></div>
+          <div class="stat"><span class="muted">RAM</span><b id="stat-ram">—</b></div>
+          <div class="stat"><span class="muted">Disk</span><b id="stat-disk">—</b></div>
+          <div class="stat"><span class="muted">Uptime</span><b id="stat-uptime">—</b></div>
+        </div>
+        <button class="btn primary big" id="btn-connect">Open remote screen</button>
+        <label class="switch" id="viewonly-switch">
+          <input type="checkbox" id="viewonly">
+          <span>View only (no touch input)</span>
+        </label>
+      </section>
+
+      <div class="tiles">
+        <button class="tile" id="tile-screenshot">
+          <svg viewBox="0 0 24 24" class="ico big-ico"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3"/></svg>
+          <span>Screenshot</span>
+        </button>
+        <button class="tile" id="tile-power">
+          <svg viewBox="0 0 24 24" class="ico big-ico"><path d="M12 3v9"/><path d="M6.6 6.6a8 8 0 1 0 10.8 0"/></svg>
+          <span>Power</span>
+        </button>
+        <button class="tile" id="tile-pair">
+          <svg viewBox="0 0 24 24" class="ico big-ico"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM20 17v4h-3"/></svg>
+          <span>Pair device</span>
+        </button>
+        <button class="tile" id="tile-pad">
+          <svg viewBox="0 0 24 24" class="ico big-ico"><path d="M7 12h10"/><path d="M9 10v4"/><circle cx="7.5" cy="12" r="4.5"/><circle cx="16.5" cy="12" r="4.5"/></svg>
+          <span>Gamepad</span>
+        </button>
+<button class="tile" id="tile-mouse"><strong>Mouse pad</strong><span>Pointer, clicks & motion</span></button>
+        <button class="tile" id="tile-settings">
+          <svg viewBox="0 0 24 24" class="ico big-ico"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1"/></svg>
+          <span>Settings</span>
+        </button>
+      </div>
+
+      <section class="card" id="vnc-card" hidden>
+        <h3>VNC service</h3>
+        <p class="muted small" id="vnc-msg"></p>
+        <div class="row">
+          <button class="btn" id="btn-vnc-start">Start VNC</button>
+          <button class="btn" id="btn-vnc-stop">Stop</button>
+        </div>
+      </section>
+
+      <section class="card" id="wayland-card" hidden>
+        <h3>Wayland session detected</h3>
+        <p class="muted small">
+          x11vnc can only capture an <b>X11</b> session. Log out, click the gear on the login
+          screen and choose <b>“Ubuntu on Xorg”</b>, then start this app again. Wayland-based
+          capture (gnome-remote-desktop) can be added later — ask me and I'll wire it up.
+        </p>
+      </section>
+    </main>
+
+    <nav class="tabbar">
+      <button class="tab active" data-tab="home"><svg viewBox="0 0 24 24" class="ico"><path d="M4 10.5 12 4l8 6.5V20H4z"/></svg><span>Home</span></button>
+      <button class="tab" data-tab="screenshot"><svg viewBox="0 0 24 24" class="ico"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3"/></svg><span>Screen</span></button>
+      <button class="tab" data-tab="settings"><svg viewBox="0 0 24 24" class="ico"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1"/></svg><span>Settings</span></button>
+    </nav>
+  </section>
+
+  <!-- ───────────────────────── remote screen ───────────────────────── -->
+  <section id="screen-remote" class="screen remote" hidden>
+    <div id="remote-stage">
+      <div id="remote-wrap" aria-label="Remote screen"><div id="remote-host"></div></div>
+      <div id="remote-status" class="overlay-center">
+        <div class="spinner"></div>
+        <p id="remote-status-text">Connecting…</p>
+        <button class="btn" id="btn-retry" hidden>Try again</button>
+        <button class="btn ghost" id="btn-remote-diag" hidden>Diagnostics</button>
+        <button class="btn ghost" id="btn-back-from-error" hidden>Back</button>
+      </div>
+      <div id="remote-tapzone"></div>
+    </div>
+
+    <header class="topbar floating" id="remote-bar">
+      <button class="icon-btn" id="btn-remote-back" aria-label="Back">
+        <svg viewBox="0 0 24 24" class="ico"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <div class="topbar-title">
+        <span class="dot" id="remote-dot"></span>
+        <strong id="remote-title">Connecting…</strong>
+      </div>
+      <button class="icon-btn" id="btn-remote-hide" aria-label="Hide controls" title="Hide controls">
+        <svg viewBox="0 0 24 24" class="ico"><path d="M4 8l8 8 8-8"/></svg>
+      </button>
+    </header>
+
+    <div class="remote-dock" id="remote-dock">
+      <div class="mods" id="mod-row" hidden>
+        <button class="chip" data-mod="ControlLeft">Ctrl</button>
+        <button class="chip" data-mod="AltLeft">Alt</button>
+        <button class="chip" data-mod="ShiftLeft">⇧</button>
+        <button class="chip" data-mod="MetaLeft">Super</button>
+        <span class="mod-sep"></span>
+        <button class="chip key-send" data-send="Escape">Esc</button>
+        <button class="chip key-send" data-send="Tab">Tab</button>
+        <button class="chip key-send" data-send="Enter">⏎</button>
+        <button class="chip key-send" data-send="Backspace">⌫</button>
+        <button class="chip key-send" data-send="Delete">Del</button>
+        <button class="chip key-send" data-send="ArrowUp">↑</button>
+        <button class="chip key-send" data-send="ArrowDown">↓</button>
+        <button class="chip key-send" data-send="ArrowLeft">←</button>
+        <button class="chip key-send" data-send="ArrowRight">→</button>
+        <button class="chip key-send" data-send="PageUp">PgUp</button>
+        <button class="chip key-send" data-send="PageDown">PgDn</button>
+        <button class="chip key-send" data-send="Home">Home</button>
+        <button class="chip key-send" data-send="End">End</button>
+        <button class="chip key-send" data-send="F5">F5</button>
+        <button class="chip key-send" data-send="PrintScreen">PrtSc</button>
+        <button class="chip danger" data-send="ctrl-alt-del">Ctrl+Alt+Del</button>
+      </div>
+
+      <div class="pillbar">
+<button class="pill-btn" id="remote-left">Left click</button><button class="pill-btn" id="remote-right">Right click</button><button class="pill-btn" data-fullscreen>Fullscreen</button><button class="pill-btn" data-edit="remote">Layout</button>
+        <button class="pill-btn" id="btn-kbd" aria-label="Keyboard">
+          <svg viewBox="0 0 24 24" class="ico"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 9.5h.01M9 9.5h.01M12 9.5h.01M15 9.5h.01M18 9.5h.01M7 13.5h10"/></svg>
+        </button>
+        <button class="pill-btn" id="btn-mode" aria-label="Input mode">
+          <svg viewBox="0 0 24 24" class="ico" id="ico-mode-touch"><path d="M12 3v9"/><path d="M6.6 6.6a8 8 0 1 0 10.8 0"/></svg>
+          <span class="mode-label" id="mode-label">Touch</span>
+        </button>
+        <button class="pill-btn" id="btn-scroll" aria-label="Scroll mode">
+          <svg viewBox="0 0 24 24" class="ico"><path d="M12 3v18"/><path d="M9 6l3-3 3 3M9 18l3 3 3-3"/></svg>
+        </button>
+        <button class="pill-btn" id="btn-more" aria-label="More">
+          <svg viewBox="0 0 24 24" class="ico"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>
+        </button>
+        <button class="pill-btn" id="btn-show-bar" hidden aria-label="Show controls">
+          <svg viewBox="0 0 24 24" class="ico"><path d="M12 5l0 14"/><path d="M8 9l4-4 4 4"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="menu" id="remote-menu" hidden>
+      <button class="menu-item" data-action="keyboard">Keyboard <b>abc</b></button>
+      <button class="menu-item" data-action="clipboard">Clipboard…</button>
+      <button class="menu-item" data-action="screenshot">Take screenshot</button>
+      <button class="menu-item" data-action="zoom">Zoom: <b id="menu-zoom">Fit</b></button>
+      <button class="menu-item" data-action="quality">Quality: <b id="menu-quality">Balanced</b></button>
+      <button class="menu-item" data-action="viewonly">View only: <b id="menu-viewonly">off</b></button>
+      <button class="menu-item" data-action="fullscreen">Fullscreen</button>
+      <button class="menu-item" data-action="gestures">Gestures &amp; help</button>
+      <button class="menu-item ptt" id="btn-ptt">🎙 Hold to talk on PC</button>
+      <button class="menu-item danger" data-action="disconnect">Disconnect</button>
+    </div>
+
+    <textarea id="kbd-proxy" class="kbd-proxy" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" tabindex="-1"></textarea>
+  </section>
+
+    <!-- Gamepad: full-screen landscape controller -->
+    <section id="screen-pad" class="screen pad-screen" hidden>
+      <header class="pad-top">
+        <button class="pad-chip" id="pad-exit" title="Back">✕</button>
+        <button class="pad-chip" id="pad-to-mouse">Mouse pad</button><button class="pad-chip" data-fullscreen>Fullscreen</button><button class="pad-chip" data-edit="pad">Layout</button><div class="pad-status"><span class="dot" id="pad-dot"></span><span id="pad-title">Gamepad</span></div>
+        <button class="pad-chip" id="pad-settings" title="Settings">⚙</button>
+      </header>
+
+      <div class="pad-triggers">
+        <button class="pad-trigger" data-pad-trigger="lt" id="pad-lt">LT</button>
+        <button class="pad-trigger" data-pad-trigger="rt" id="pad-rt">RT</button>
+      </div>
+
+      <div class="pad-shoulders">
+        <button class="pad-shoulder" data-pad-btn="lb">LB</button>
+        <button class="pad-shoulder" data-pad-btn="rb">RB</button>
+      </div>
+
+      <div class="pad-sticks">
+        <div class="pad-zone" id="pad-move"></div>
+        <div class="pad-zone" id="pad-look"></div>
+      </div>
+
+      <div class="pad-dpad-wrap">
+        <div class="pad-dpad" id="pad-dpad">
+          <span class="pad-dpad-arrow up">▲</span>
+          <span class="pad-dpad-arrow right">▶</span>
+          <span class="pad-dpad-arrow down">▼</span>
+          <span class="pad-dpad-arrow left">◀</span>
+        </div>
+      </div>
+
+      <div class="pad-face">
+        <button class="pad-btn y" data-pad-btn="y">Y</button>
+        <button class="pad-btn x" data-pad-btn="x">X</button>
+        <button class="pad-btn b" data-pad-btn="b">B</button>
+        <button class="pad-btn a" data-pad-btn="a">A</button>
+      </div>
+
+      <div class="pad-system">
+        <button class="pad-chip small" data-pad-btn="ls">L3</button><button class="pad-chip small" data-pad-btn="rs">R3</button><button class="pad-chip small" data-pad-btn="guide">Guide</button><button class="pad-chip small" data-pad-btn="back">Select</button>
+        <button class="pad-chip small" data-pad-btn="start">Start</button>
+      </div>
+
+      <div class="pad-mouse" id="pad-mouse">
+        <button class="pad-click" id="pad-click-left">L</button>
+        <button class="pad-chip" id="pad-motion-toggle">Motion: off</button>
+        <button class="pad-chip" id="pad-center">Re-centre</button>
+        <button class="pad-click" id="pad-click-right">R</button>
+      </div>
+
+      <div class="pad-panel" id="pad-panel">
+        <label class="row between">
+          <span>Aim sensitivity</span>
+          <input type="range" id="pad-sens" min="0.3" max="2.5" step="0.1" value="1">
+        </label>
+        <p class="muted small">Left stick moves, right stick looks. Triggers are analog.
+          Turn on <b>Motion</b> to aim by tilting the phone.</p>
+      </div>
+    </section>
+</div>
+
+<section id="screen-mouse" class="screen mouse-screen" hidden>
+  <header class="control-top"><button class="pad-chip" id="mouse-back">Back</button><strong>Mouse pad</strong><button class="pad-chip" data-fullscreen>Fullscreen</button><button class="pad-chip" data-edit="mouse">Layout</button></header>
+  <div id="mouse-surface" data-layout="surface" tabindex="0" role="region" aria-label="Remote touchpad"><strong>Slide to move</strong><span>Two fingers to scroll · use the buttons below to click</span></div>
+  <div class="mouse-clicks"><button id="mouse-left" data-layout="left" class="pad-click">Left click</button><button id="mouse-right" data-layout="right" class="pad-click">Right click</button></div>
+  <footer class="mouse-options"><button class="pad-chip" id="mouse-motion">Enable motion</button><button class="pad-chip" id="mouse-center">Re-centre</button><label>Sensitivity <input id="mouse-sens" type="range" min="0.3" max="3" step="0.1" value="1"></label><p id="mouse-status" role="status">Touch controls ready. Motion is optional.</p></footer>
+</section>
+<!-- ───────────────────────── sheets ───────────────────────── -->
+<div class="sheet-backdrop" id="backdrop" hidden></div>
+
+<aside class="sheet" id="sheet-settings" hidden>
+  <header class="sheet-head"><h2>Settings</h2><button class="icon-btn" data-close-sheet aria-label="Close">✕</button></header>
+  <div class="sheet-body">
+    <label class="field"><span>PC name</span><input id="set-name" type="text" maxlength="40"></label>
+    <label class="field"><span>Streaming quality</span>
+      <div class="segmented" id="set-quality">
+        <button data-value="sharp">Sharp</button><button data-value="balanced">Balanced</button><button data-value="fast">Fast</button>
+      </div>
+    </label>
+    <label class="field"><span>VNC password (optional, 4–8 chars)</span><input id="set-vncpass" type="text" maxlength="8" placeholder="none"></label>
+    <label class="field"><span>Push-to-talk key on PC</span><input id="set-pttkey" type="text" maxlength="24" placeholder="space"></label>
+    <div class="row">
+      <button class="btn" id="btn-save-settings">Save</button>
+      <button class="btn ghost" id="btn-restart-vnc">Restart VNC</button>
+    </div>
+    <hr>
+    <h3>This device</h3>
+    <p class="muted small" id="settings-device">—</p>
+    <div class="row">
+      <button class="btn ghost" id="btn-pair-here">Show pairing QR</button>
+      <button class="btn ghost" id="btn-show-diag">Diagnostics</button>
+    </div>
+    <div class="row">
+      <button class="btn" id="btn-install" hidden>Install app on this phone</button>
+    </div>
+    <p class="muted small" id="install-hint" hidden>Adds a home-screen icon and opens full screen, without the browser bar.</p>
+    <button class="btn danger" id="btn-logout">Sign out</button>
+  </div>
+</aside>
+
+<aside class="sheet" id="sheet-pair" hidden>
+  <header class="sheet-head"><h2>Pair another device</h2><button class="icon-btn" data-close-sheet aria-label="Close">✕</button></header>
+  <div class="sheet-body center">
+    <p class="muted small">Scan this with the other phone's camera. Valid for 10 minutes.</p>
+    <div class="qrbox" id="qrbox"></div>
+    <div class="urlbox"><code id="pair-url">…</code><button class="btn small" id="btn-copy-pair">Copy</button></div>
+    <button class="btn ghost" id="btn-new-pair">New code</button>
+  </div>
+</aside>
+
+<aside class="sheet" id="sheet-power" hidden>
+  <header class="sheet-head"><h2>Power</h2><button class="icon-btn" data-close-sheet aria-label="Close">✕</button></header>
+  <div class="sheet-body stack">
+    <button class="btn big" data-power="lock">🔒 Lock screen</button>
+    <button class="btn big" data-power="suspend">🌙 Suspend</button>
+    <button class="btn big" data-power="reboot">↻ Restart</button>
+    <button class="btn big danger" data-power="poweroff">⏻ Shut down</button>
+    <p class="muted small" id="power-hint"></p>
+  </div>
+</aside>
+
+<aside class="sheet" id="sheet-gestures" hidden>
+  <header class="sheet-head"><h2>Gestures</h2><button class="icon-btn" data-close-sheet aria-label="Close">✕</button></header>
+  <div class="sheet-body">
+    <h3>Touch mode <small class="muted">(finger = mouse pointer, 1:1)</small></h3>
+    <ul class="list">
+      <li><b>Tap</b> — left click</li>
+      <li><b>Drag</b> — move / drag &amp; drop</li>
+      <li><b>Hold ½ second</b> — right click</li>
+      <li><b>Two fingers drag</b> — scroll the desktop</li>
+      <li><b>Two fingers tap</b> — right click</li>
+      <li><b>Pinch</b> — zoom the view</li>
+    </ul>
+    <h3>Trackpad mode <small class="muted">(relative, precise)</small></h3>
+    <ul class="list">
+      <li><b>Move finger</b> — move the pointer</li>
+      <li><b>Tap</b> — left click</li>
+      <li><b>Two fingers drag</b> — scroll</li>
+      <li><b>Two fingers tap</b> — right click</li>
+    </ul>
+    <p class="muted small">When zoomed in, drag with two fingers to pan the view.</p>
+  </div>
+</aside>
+
+<aside class="sheet" id="sheet-clipboard" hidden>
+  <header class="sheet-head"><h2>Clipboard</h2><button class="icon-btn" data-close-sheet aria-label="Close">✕</button></header>
+  <div class="sheet-body stack">
+    <label class="field"><span>Type or paste text to send to the PC</span>
+      <textarea id="clip-out" rows="4" placeholder="Text to paste on the PC…"></textarea>
+    </label>
+    <button class="btn primary" id="btn-clip-send">Send to PC clipboard</button>
+    <label class="field"><span>Clipboard from PC</span>
+      <textarea id="clip-in" rows="4" readonly placeholder="(nothing received yet)"></textarea>
+    </label>
+    <button class="btn" id="btn-clip-copy">Copy to this phone</button>
+    <p class="muted small" id="clip-hint"></p>
+  </div>
+</aside>
+
+<aside class="sheet" id="sheet-shot" hidden>
+  <header class="sheet-head"><h2>Screenshot</h2><button class="icon-btn" data-close-sheet aria-label="Close">✕</button></header>
+  <div class="sheet-body center">
+    <img id="shot-img" alt="Screenshot of the PC" hidden>
+    <p class="muted small" id="shot-msg">Loading…</p>
+    <a class="btn" id="shot-open" target="_blank" rel="noopener" hidden>Open full size</a>
+    <button class="btn ghost" id="btn-shot-again">Refresh</button>
+  </div>
+</aside>
+
+<aside class="sheet" id="sheet-diag" hidden>
+  <header class="sheet-head"><h2>Diagnostics</h2><button class="icon-btn" data-close-sheet aria-label="Close">✕</button></header>
+  <div class="sheet-body stack">
+    <p class="muted small" id="diag-hint">
+      A self-test of the whole chain, run on your PC. If the screen won't connect,
+      copy this and send it over — it names the failing step.
+    </p>
+    <textarea id="diag-text" class="diag-text" rows="14" readonly spellcheck="false"></textarea>
+    <div class="row">
+      <button class="btn" id="btn-diag-copy">Copy report</button>
+      <button class="btn ghost" id="btn-diag-again">Run again</button>
+    </div>
+    <div class="row">
+      <button class="btn ghost" id="btn-diag-restart">Restart server</button>
+      <button class="btn ghost" id="btn-diag-vnc">Restart screen server</button>
+    </div>
+  </div>
+</aside>
+
+<div id="toasts" class="toasts"></div>
+
+<script type="module" src="/assets/app.js"></script>
+</body>
+</html>

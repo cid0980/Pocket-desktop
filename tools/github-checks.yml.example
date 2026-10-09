@@ -1,0 +1,27 @@
+name: Checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Shell syntax and non-mutating installer tests
+        run: python3 test/setup-test.py
+      - name: JavaScript syntax
+        run: |
+          for file in server.js lib/*.js public/assets/*.js test/*.js; do
+            node --check "$file"
+          done
+      - name: Python syntax
+        run: python3 -m py_compile tools/pad-uinput.py
+      - name: Isolated restart test
+        run: node test/restart-test.js --port 8790 --pin 3131
+      - name: Isolated stream test
+        run: node test/throughput-test.js --port 8899 --vnc-port 15997
+# Physical sensors, distro installation, real X11 sessions and uinput devices
+# are not available in this job. See VERIFICATION.md for manual/sandbox checks.

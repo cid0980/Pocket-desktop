@@ -1,0 +1,18 @@
+# runtime
+config.json
+test/artifacts/
+node_modules/
+*.log
+# local secrets and machine-specific files
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.zip
+__pycache__/
+.DS_Store
+.idea/
+.vscode/
