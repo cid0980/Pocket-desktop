@@ -25,6 +25,7 @@ const ws = require('./lib/ws');
 const logbuf = require('./lib/logbuf');
 const diagnostics = require('./lib/diagnostics');
 const pad = require('./lib/pad');
+const keyboard = require('./lib/keyboard');
 const { log } = logbuf;
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -418,6 +419,11 @@ const routes = {
     const svg = qrSvg(url);
     ctx.res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'no-store' });
     ctx.res.end(svg);
+  },
+
+  'POST /api/keyboard': async (ctx) => {
+    const result=await keyboard.send(await readBody(ctx.req));
+    json(ctx.res,result.ok?200:(result.status||503),result);
   },
 
   'GET /api/sysinfo': async (ctx) => json(ctx.res, 200, { ok: true, data: await system.info() }),

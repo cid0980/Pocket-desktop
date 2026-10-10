@@ -1,0 +1,4 @@
+<!doctype html><meta charset="utf-8"><title>Keyboard verification target</title>
+<style>body{font:24px sans-serif;padding:40px;background:#edf2f5}textarea{display:block;width:90%;height:280px;font:24px sans-serif;margin-top:16px}button{font:24px sans-serif;padding:20px}</style>
+<h1>Controlled keyboard test target</h1><label>Actual X11 input<textarea id="text" autofocus></textarea></label><button id="enter-target">Enter activates this</button><p id="result"></p>
+<script>window.keyEvents=[];window.activations=0;document.addEventListener('keydown',e=>keyEvents.push({key:e.key,ctrl:e.ctrlKey,trusted:e.isTrusted}));document.querySelector('#enter-target').onclick=()=>document.querySelector('#result').textContent=++activations;window.clearTarget=()=>{document.querySelector('#text').value='';document.querySelector('#text').focus();keyEvents=[];activations=0;};</script>

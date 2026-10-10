@@ -227,11 +227,13 @@ class GamepadScreen {
       { onPress: press, onRelease: release, haptics: this.settings.haptics },
     ));
 
+    this.triggerResets=[];
     // Axis protocol is 0..255, not normalized 0..1. Ordinary touches press
     // fully; pressure-capable pens use pressure, dragging upward feathers it.
     for (const el of root.querySelectorAll('[data-pad-trigger]')) {
       const axis = el.dataset.padTrigger;
       let pointer = null, startY = 0;
+      this.triggerResets.push(()=>{pointer=null;el.classList.remove('down');this.setTrigger(axis,0);});
       listen(el, 'pointerdown', e => {
         if (pointer !== null) return;
         pointer = e.pointerId; startY = e.clientY;
@@ -254,7 +256,7 @@ class GamepadScreen {
 
     this.motionController = new MotionPointer(msg => this.socket.send(msg), (text, active) => {
       if(this.motionBtn) this.motionBtn.textContent = active ? 'Motion: on' : 'Motion: off';
-      this.onToast(text, active ? '' : 'info', 8000);
+      if(text!=='Motion off')this.onToast(text, active ? '' : 'info', 8000);
     }, () => this.settings.motionSensitivity);
     // Motion mouse
     this.motionBtn = root.querySelector('#pad-motion-toggle');
@@ -266,18 +268,9 @@ class GamepadScreen {
     if (this.rightClick) this.bindClick(this.rightClick, 'right');
 
     listen(root.querySelector('#pad-exit'), 'click', () => this.exit());
-    listen(root.querySelector('#pad-settings'), 'click', () => {
-      root.querySelector('#pad-panel')?.classList.toggle('open');
-    });
     listen(root.querySelector('#pad-center'), 'click', () => this.recenter());
 
-    const sens = root.querySelector('#pad-sens');
-    if (sens) {
-      sens.value = String(this.settings.motionSensitivity);
-      listen(sens, 'input', () => {
-        this.settings.motionSensitivity = Number(sens.value);
-      });
-    }
+
   }
 
   bindClick(el, which) {
@@ -314,7 +307,8 @@ class GamepadScreen {
   recenter() { this.motionController.recenter(); this.onToast('Aim re-centred'); }
 
   releaseAll() {
-    this.left.up(); this.right.up(); this.dpad.set(0,0);
+    this.left.up(); this.right.up(); this.dpad.set(0,0);this.dpad.pointerId=null;
+    this.triggerResets.forEach(reset=>reset());
     this.padButtons.forEach(b => b.release());
     for(const axis of Object.keys(this.axes)) this.axes[axis]=0;
     for(const key of Object.keys(this.buttons)) this.buttons[key]=0;

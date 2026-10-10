@@ -1,3 +1,98 @@
+# Mobile UI and standalone keyboard — v1.4.0
+
+Verified 2026-10-10 against a controlled Linux/X11 desktop and Chromium phone
+emulation. The user confirmed v1.3.3 worked before this focused UI enhancement.
+Mouse gestures, uinput protocol, 60ms click timing and Xbox trigger ranges were
+preserved. No account, cloud service or new npm dependency was introduced.
+
+## Results
+
+| Suite | Passing checks |
+|---|---:|
+| Categorized settings, workspace navigation, touch geometry | 48 |
+| Actual desktop keyboard, authentication and error behavior | 24 |
+| Keyboard backend queue, arguments and failure handling | 9 |
+| Mouse gestures, kernel events and layout persistence | 51 |
+| Gamepad including kernel LT/RT | 56 |
+| Shared controls, layout import/export, fullscreen and simulated motion | 41 |
+| Remote screen and pointer/key effects | 25 |
+| API/security | 45 |
+| Restart | 13 |
+| uinput helper | 12 |
+| Installer | 14 |
+| Native desktop mouse clicks, scrolling and persistent text selection | 16 |
+| **Total** | **354** |
+
+Mobile geometry was checked at 390×844, 360×640, 320×568, 844×390, 568×320 and
+1024×768. Default main controls have 44px+ targets with no tested intersections
+or viewport overflow. Settings panels scroll within a fixed header/footer.
+Custom user-positioned layouts can deliberately place controls differently.
+
+Keyboard tests typed `Hello PC — café தமிழ் 😀` into the actual focused desktop
+textarea using trusted native X11 key events. Send + Enter produced a newline;
+Select all and Backspace modified the actual text; mousepad Enter activated a
+focused desktop button. Authentication and invalid payloads were checked.
+IME composition is not prematurely submitted; failed sends retain drafts.
+A hidden remote session does not also forward keyboard-workspace key events.
+
+## Problems found during testing (and scope of the evidence)
+
+- POSIX service locales and xdotool's rapid temporary Unicode remapping initially
+  dropped characters. The backend now sets UTF-8 and keeps unused Unicode
+  keycodes stable for an entire batch before restoring them. Five repeated
+  helper runs and the end-to-end test produced exact text. This is not a promise
+  that every desktop application accepts every Unicode character.
+- Narrow landscape gamepad controls originally exceeded the viewport, and some
+  system buttons were 34px tall. The center column and touch targets were fixed
+  and the geometry suite rerun successfully.
+- The remote pointer test's old hard-coded coordinate fell outside the image
+  after the dock moved. The test now samples positions inside the actual canvas;
+  the input-coordinate implementation was not altered to satisfy that test.
+- The native mouse rig had restored browser chrome/window offsets and initially
+  swallowed the first smooth-scroll event after XTEST pointer placement. The
+  test now accounts for window offsets and explicitly seeds the evdev scroll
+  baseline before measurement. Subsequent actual scroll was 800→560→800 with
+  stationary pointer; both drag methods retained `Select this te`. This rig does
+  **not** verify the first wheel event after switching X input devices. The
+  mouse input implementation was not changed in response to this fixture issue.
+- The API rate-limit test temporarily blocked a subsequent fixture login;
+  the desktop test was rerun after that lockout expired.
+
+No physical Android/iPhone touchscreen was available. Browser sensors were
+simulated; physical tilt permission, iOS fullscreen/PWA behavior, and arbitrary
+commercial games remain device/application acceptance checks, not claims here.
+
+## Clean archive check
+
+A fresh ZIP extraction was run on port 8766. Actual keyboard (24), workspace
+geometry/navigation (48), shared controls (41) and gesture/kernel checks (51)
+were rerun against that packaged copy. The screenshot helper now creates its
+artifact directory on clean installs; the initial clean runs exposed that test
+fixture omission. No local config, browser profiles, credentials or generated
+artifacts are included in the archive.
+
+## Reproduce
+
+The regular tests use the existing CDP helper and Chromium. On Node 20, add
+`--experimental-websocket`. Kernel tests need permission to read `/dev/input`.
+Use a disposable desktop, not your active work session: the tests send real input.
+
+```bash
+node test/keyboard-unit-test.js
+node --experimental-websocket test/workspaces-test.js
+node --experimental-websocket test/controls-test.js
+sudo node --experimental-websocket test/gestures-test.js
+sudo node --experimental-websocket test/pad-test.js
+```
+
+`test/keyboard-test.js` expects a headed Chromium on X11 `:99`, debug port 9340,
+showing `test/keyboard-target.html`, with the app using that display. The native
+mouse rig is documented in `test/SELECTION.md`. `PORT` changes the app test port.
+
+---
+
+## Previous release investigation (retained for context)
+
 # Mousepad pipeline revision — v1.3.3
 
 Verified 2026-10-10. This is a targeted input-path update, not a UI-only change.

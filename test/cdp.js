@@ -203,6 +203,7 @@ async function waitFor(cdp, sessionId, expression, { timeout = 15000, interval =
 }
 
 async function screenshot(cdp, sessionId, filePath) {
+  fs.mkdirSync(path.dirname(filePath), {recursive:true});
   const { data } = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }, sessionId);
   require('fs').writeFileSync(filePath, Buffer.from(data, 'base64'));
   return filePath;

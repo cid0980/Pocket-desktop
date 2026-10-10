@@ -132,6 +132,7 @@
           <span>Gamepad</span>
         </button>
 <button class="tile" id="tile-mouse"><strong>Mouse pad</strong><span>Pointer, clicks & motion</span></button>
+        <button class="tile" id="tile-keyboard"><span class="tile-symbol">⌨</span><strong>Keyboard</strong><span>Type & send keys</span></button>
         <button class="tile" id="tile-settings">
           <svg viewBox="0 0 24 24" class="ico big-ico"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1"/></svg>
           <span>Settings</span>
@@ -239,6 +240,7 @@
 
     <div class="menu" id="remote-menu" hidden>
       <button class="menu-item" data-action="keyboard">Keyboard <b>abc</b></button>
+      <button class="menu-item" data-action="keyboard-page">Keyboard workspace</button><button class="menu-item" data-action="settings-page">Screen settings</button>
       <button class="menu-item" data-action="clipboard">Clipboard…</button>
       <button class="menu-item" data-action="screenshot">Take screenshot</button>
       <button class="menu-item" data-action="zoom">Zoom: <b id="menu-zoom">Fit</b></button>
@@ -257,8 +259,8 @@
     <section id="screen-pad" class="screen pad-screen" hidden>
       <header class="pad-top">
         <button class="pad-chip" id="pad-exit" title="Back">✕</button>
-        <button class="pad-chip" id="pad-to-mouse">Mouse pad</button><button class="pad-chip" data-fullscreen>Fullscreen</button><button class="pad-chip" data-edit="pad" aria-label="Edit gamepad layout">Edit layout</button><div class="pad-status"><span class="dot" id="pad-dot"></span><span id="pad-title">Gamepad</span></div>
-        <button class="pad-chip" id="pad-settings" title="Settings">⚙</button>
+        <button class="pad-chip" id="pad-to-mouse">Mouse pad</button><button class="pad-chip" data-fullscreen data-compact aria-label="Fullscreen"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg></button><button class="pad-chip" data-edit="pad" aria-label="Edit gamepad layout">Layout</button><div class="pad-status"><span class="dot" id="pad-dot"></span><span id="pad-title">Gamepad</span></div>
+        <button class="pad-chip" id="pad-settings" title="Gamepad settings" aria-label="Gamepad settings">⚙</button>
       </header>
 
       <div class="pad-triggers">
@@ -306,7 +308,7 @@
 
       <div class="pad-panel" id="pad-panel">
         <button class="btn" data-edit="pad">Customize gamepad layout</button>
-        <p class="muted small">v1.3.3 · Move outlined controls, then Save. Cancel keeps your previous layout.</p>
+        <p class="muted small">v1.4.0 · Move outlined controls, then Save. Cancel keeps your previous layout.</p>
         <label class="row between">
           <span>Aim sensitivity</span>
           <input type="range" id="pad-sens" min="0.3" max="2.5" step="0.1" value="1">
@@ -318,51 +320,64 @@
 </div>
 
 <section id="screen-mouse" class="screen mouse-screen" hidden>
-  <header class="control-top"><button class="pad-chip" id="mouse-back">Back</button><strong>Mouse pad</strong><button class="pad-chip" data-fullscreen>Fullscreen</button><button class="pad-chip" data-edit="mouse">Layout</button></header>
+  <header class="control-top"><button class="pad-chip" id="mouse-back" aria-label="Back">←</button><strong>Mouse pad</strong><button class="pad-chip" data-fullscreen data-compact aria-label="Fullscreen"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg></button><button class="pad-chip" id="mouse-settings" aria-label="Mousepad settings">⚙</button></header>
   <div class="mouse-workspace">
     <div id="mouse-surface" data-layout="surface" tabindex="0" role="region" aria-label="Remote touchpad"><strong>Slide to move</strong><span>Tap: left click · Double tap: right click<br>Hold 400 ms, then move to drag<br>One finger to move · Scroll using the strip →</span></div>
     <div id="mouse-scroll" role="slider" tabindex="0" aria-label="Scroll vertically: drag up or down" aria-orientation="vertical" aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0"><span>▲</span><span class="scroll-thumb">↕</span><span>SCROLL</span><span>▼</span></div>
   </div>
-  <div class="mouse-clicks"><button id="mouse-left" data-layout="left" class="pad-click">Left click</button><button id="mouse-right" data-layout="right" class="pad-click">Right click</button></div>
-  <footer class="mouse-options">
+  <div class="mouse-clicks"><button id="mouse-left" data-layout="left" class="pad-click">Left click</button><button id="mouse-right" data-layout="right" class="pad-click">Right click</button><button id="mouse-enter" class="pad-click" aria-label="Send Enter to PC">Enter ↵</button></div>
+  <footer class="mouse-options"><button class="btn ghost" id="mouse-keyboard">⌨ Keyboard</button>
     <label class="mouse-pref" for="mouse-speed"><span>Pointer Speed <output id="mouse-speed-value">0.60×</output></span><span class="speed-range">Slow <input id="mouse-speed" type="range" min="0.2" max="2" step="0.05" value="0.6"> Fast</span></label>
     <label class="mouse-pref" for="mouse-tap-interval"><span>Double-tap window <output id="mouse-tap-value">300 ms</output></span><input id="mouse-tap-interval" type="range" min="250" max="350" step="10" value="300"></label>
-    <p id="mouse-preference-status" role="status">Settings apply immediately · v1.3.3</p>
+    <p id="mouse-preference-status" role="status">Settings apply immediately · v1.4.0</p>
     <p id="mouse-input-status" role="status">Connecting to PC…</p>
     <details class="mouse-motion-settings"><summary>Optional motion controls</summary><button class="pad-chip" id="mouse-motion">Enable motion</button><button class="pad-chip" id="mouse-center">Re-centre</button><label>Motion sensitivity <input id="mouse-sens" type="range" min="0.3" max="3" step="0.1" value="1"></label><p id="mouse-status" role="status">Motion is optional; it does not change touchpad speed.</p></details>
   </footer>
 </section>
+<section id="screen-keyboard" class="screen keyboard-screen" hidden>
+  <header class="control-top"><button class="pad-chip" id="keyboard-back" aria-label="Back">←</button><strong>Keyboard</strong><button class="pad-chip" data-fullscreen data-compact aria-label="Fullscreen"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg></button><button class="pad-chip" id="keyboard-settings" aria-label="Keyboard settings">⚙</button></header>
+  <main class="keyboard-body">
+    <div class="workspace-intro"><span class="eyebrow">TYPE ON YOUR PHONE</span><h1>Your PC. Your words.</h1><p>Focus a field on the PC first. Review your text here, then send it.</p></div>
+    <label class="keyboard-compose"><span>Text to send <small id="keyboard-count">0 / 1024</small></span><textarea id="keyboard-draft" maxlength="1024" rows="3" placeholder="Tap here to open your phone keyboard…" autocomplete="off" spellcheck="true"></textarea></label>
+    <div class="keyboard-send"><button class="btn primary" id="keyboard-send">Send text</button><button class="btn ghost" id="keyboard-send-enter">Send + Enter</button></div>
+    <p id="keyboard-status" role="status">Draft stays on this page until you send it.</p>
+    <div class="keyboard-tabs" role="tablist" aria-label="Keyboard key groups"><button role="tab" aria-selected="true" data-key-group="essentials">Essentials</button><button role="tab" aria-selected="false" data-key-group="navigation">Navigation</button><button role="tab" aria-selected="false" data-key-group="shortcuts">Shortcuts</button></div>
+    <div class="keyboard-key-group" data-key-panel="essentials"><button data-remote-key="Escape">Esc</button><button data-remote-key="Tab">Tab ⇥</button><button data-remote-key="Backspace">⌫ Backspace</button><button data-remote-key="Enter">Enter ↵</button><button data-remote-key="Space">Space</button><button data-remote-key="Delete">Delete</button></div>
+    <div class="keyboard-key-group" data-key-panel="navigation" hidden><button data-remote-key="ArrowLeft" aria-label="Left arrow">←</button><button data-remote-key="ArrowUp" aria-label="Up arrow">↑</button><button data-remote-key="ArrowDown" aria-label="Down arrow">↓</button><button data-remote-key="ArrowRight" aria-label="Right arrow">→</button><button data-remote-key="Home">Home</button><button data-remote-key="End">End</button><button data-remote-key="PageUp">Page up</button><button data-remote-key="PageDown">Page down</button></div>
+    <div class="keyboard-key-group" data-key-panel="shortcuts" hidden><button data-remote-key="SelectAll">Select all</button><button data-remote-key="Copy">Copy</button><button data-remote-key="Paste">Paste</button><button data-remote-key="Cut">Cut</button><button data-remote-key="Undo">Undo</button><button data-remote-key="Redo">Redo</button></div>
+  </main>
+</section>
 <!-- ───────────────────────── sheets ───────────────────────── -->
 <div class="sheet-backdrop" id="backdrop" hidden></div>
 
-<aside class="sheet" id="sheet-settings" hidden>
-  <header class="sheet-head"><h2>Settings</h2><button class="icon-btn" data-close-sheet aria-label="Close">✕</button></header>
-  <div class="sheet-body">
-    <label class="field"><span>PC name</span><input id="set-name" type="text" maxlength="40"></label>
-    <label class="field"><span>Streaming quality</span>
-      <div class="segmented" id="set-quality">
-        <button data-value="sharp">Sharp</button><button data-value="balanced">Balanced</button><button data-value="fast">Fast</button>
-      </div>
-    </label>
-    <label class="field"><span>VNC password (optional, 4–8 chars)</span><input id="set-vncpass" type="text" maxlength="8" placeholder="none"></label>
-    <label class="field"><span>Push-to-talk key on PC</span><input id="set-pttkey" type="text" maxlength="24" placeholder="space"></label>
-    <div class="row">
-      <button class="btn" id="btn-save-settings">Save</button>
-      <button class="btn ghost" id="btn-restart-vnc">Restart VNC</button>
-    </div>
-    <hr>
-    <h3>This device</h3>
-    <p class="muted small" id="settings-device">—</p>
-    <div class="row">
-      <button class="btn ghost" id="btn-pair-here">Show pairing QR</button>
-      <button class="btn ghost" id="btn-show-diag">Diagnostics</button>
-    </div>
-    <div class="row">
-      <button class="btn" id="btn-install" hidden>Install app on this phone</button>
-    </div>
-    <p class="muted small" id="install-hint" hidden>Adds a home-screen icon and opens full screen, without the browser bar.</p>
-    <button class="btn danger" id="btn-logout">Sign out</button>
+<aside class="sheet settings-page" id="sheet-settings" role="dialog" aria-modal="true" aria-labelledby="settings-heading" hidden>
+  <header class="sheet-head"><button class="icon-btn" id="settings-back" aria-label="All settings categories" hidden>←</button><div><small class="eyebrow">POCKET DESKTOP</small><h2 id="settings-heading">Settings</h2></div><button class="icon-btn" data-close-sheet aria-label="Close settings">✕</button></header>
+  <div class="sheet-body settings-body">
+    <nav class="settings-grid" id="settings-categories" aria-label="Settings categories">
+      <button data-category="display"><b>▣</b><span>Remote screen<small>Picture quality & connection</small></span><i>›</i></button>
+      <button data-category="mouse"><b>↖</b><span>Mouse pad<small>Pointer speed & tap timing</small></span><i>›</i></button>
+      <button data-category="gamepad"><b>✚</b><span>Gamepad<small>Layout & aiming</small></span><i>›</i></button>
+      <button data-category="keyboard"><b>⌨</b><span>Keyboard & voice<small>Text entry & talk key</small></span><i>›</i></button>
+      <button data-category="motion"><b>↝</b><span>Phone motion<small>Sensors & sensitivity</small></span><i>›</i></button>
+      <button data-category="device"><b>◇</b><span>This device<small>PC name, pairing & install</small></span><i>›</i></button>
+      <button data-category="connection"><b>⌁</b><span>Privacy & access<small>VNC password & sign out</small></span><i>›</i></button>
+      <button data-category="help"><b>?</b><span>Help & diagnostics<small>Gestures & connection checks</small></span><i>›</i></button>
+    </nav>
+    <section class="settings-category" data-category-panel="display" hidden>
+      <p class="category-intro">Tune the picture without changing your controls.</p>
+      <label class="field"><span>Streaming quality</span><div class="segmented" id="set-quality"><button data-value="sharp">Sharp</button><button data-value="balanced">Balanced</button><button data-value="fast">Fast</button></div></label>
+      <p class="muted small">Fast uses less bandwidth. Sharp favors image detail.</p>
+      <button class="btn ghost" id="btn-restart-vnc">Restart screen connection</button>
+    </section>
+    <section class="settings-category" data-category-panel="mouse" hidden><p class="category-intro">Applied immediately and saved on this browser.</p><div id="mouse-speed-settings"></div><div id="mouse-timing-settings"></div><button class="btn ghost" data-workspace="layout-mouse">Customize mousepad layout</button><p class="muted small">One tap: left click. Two taps: right click. Hold 400 ms, then move to drag. Scroll with the right-side strip.</p></section>
+    <section class="settings-category" data-category-panel="gamepad" hidden><p class="category-intro">Make your controls comfortable for your hands.</p><button class="btn" data-workspace="layout-pad">Customize gamepad layout</button><div id="gamepad-aim-settings"></div><p class="muted small">Layout editing has separate Save, Cancel and Reset actions. Controls cannot move during normal gameplay.</p></section>
+    <section class="settings-category" data-category-panel="keyboard" hidden><p class="category-intro">Type using your phone's keyboard, then send text to the focused PC app.</p><button class="btn" data-workspace="keyboard">Open keyboard</button><label class="field"><span>Push-to-talk key on PC</span><input id="set-pttkey" type="text" maxlength="24" placeholder="space"></label><p class="muted small">Voice controls on the remote screen use this key.</p></section>
+    <section class="settings-category" data-category-panel="motion" hidden><p class="category-intro">Motion needs trusted HTTPS, a compatible phone and sensor permission.</p><button class="btn" id="settings-connect-motion">Connect mouse controls</button><div id="motion-settings-content"></div></section>
+    <section class="settings-category" data-category-panel="device" hidden><label class="field"><span>PC name</span><input id="set-name" type="text" maxlength="40"></label><p class="muted small" id="settings-device">—</p><button class="btn ghost" id="btn-pair-here">Pair another device</button><button class="btn" id="btn-install" hidden>Install on this phone</button><p class="muted small" id="install-hint" hidden></p></section>
+    <section class="settings-category" data-category-panel="connection" hidden><p class="category-intro">Keep access private. Use this app only on networks you trust.</p><label class="field"><span>VNC password (optional, 4–8 characters)</span><input id="set-vncpass" type="password" maxlength="8" placeholder="none" autocomplete="off"></label><p class="muted small">This is the screen-server password, not your app PIN.</p><button class="btn danger" id="btn-logout">Sign out of this phone</button></section>
+    <section class="settings-category" data-category-panel="help" hidden><p class="category-intro">Check the connection or look up a gesture.</p><button class="btn" id="btn-show-diag">Run diagnostics</button><button class="btn ghost" id="settings-gestures">Remote-screen gesture guide</button><p class="muted small">v1.4.0 · Input stays on your local network. Keyboard drafts are not saved to browser storage.</p></section>
   </div>
+  <footer class="settings-save" id="settings-save-bar" hidden><span>PC settings need saving.</span><button class="btn" id="btn-save-settings">Save changes</button></footer>
 </aside>
 
 <aside class="sheet" id="sheet-pair" hidden>

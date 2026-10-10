@@ -402,7 +402,7 @@ export class RemoteSession {
   }
 
   _onKeyDown(ev) {
-    if (!this._active || this.viewOnly) return;
+    if (!this._active || this.viewOnly || !this.stage.getClientRects().length || document.querySelector('.sheet:not([hidden]),.layout-editor:not([hidden])') || ev.target?.closest('button,a,select,.sheet')) return;
     const target = ev.target;
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
     if (ev.metaKey && ev.code === 'Tab') return; // don't hijack OS/browser tab switching

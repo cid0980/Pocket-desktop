@@ -2,6 +2,7 @@
 
 import { RemoteSession } from './remote.js';
 import './pad.js';
+import {settingsNavigation, keyboardWorkspace} from './workspaces.js';
 import { LayoutEditor, fullscreen, MotionPointer, bindMouseButton, bindTouchpad, bindScrollStrip } from './controls.js';
 
 /* ── tiny helpers ──────────────────────────────────────────────── */
@@ -10,7 +11,7 @@ const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
 
 /** Keep in sync with VERSION in lib/config.js — a test asserts they match. */
-const CLIENT_VERSION = '1.3.3';
+const CLIENT_VERSION = '1.4.0';
 
 /**
  * Session token store. Normally the session lives in an HttpOnly cookie, but
@@ -108,7 +109,7 @@ const state = {
 
 /* ── screens ───────────────────────────────────────────────────── */
 
-const SCREENS = ['setup', 'login', 'home', 'remote', 'pad', 'mouse'];
+const SCREENS = ['setup', 'login', 'home', 'remote', 'pad', 'mouse', 'keyboard'];
 
 function show(name) {
   for (const s of SCREENS) {
@@ -119,9 +120,7 @@ function show(name) {
   document.body.classList.toggle('remote-active', name === 'remote');
   if (name === 'home') startPolling();
   else stopPolling();
-  if (name === 'remote') {
-    setTimeout(() => $('#kbd-proxy')?.focus({ preventScroll: true }), 50);
-  }
+  // Do not summon the phone keyboard until the user explicitly requests it.
 }
 
 /**
@@ -274,7 +273,7 @@ async function openPad() {
   if (padScreen) { padScreen.onExit = () => {}; padScreen.exit(); }
   padScreen = new window.PocketPad.GamepadScreen({
     socket: controlSocket,
-    settings: {},
+    settings: {motionSensitivity:Number($('#pad-sens').value)||1},
     onToast: toast,
     onExit: () => {
       padScreen = null;
@@ -302,6 +301,7 @@ for(const [selector,key]of [['#mouse-speed','speed'],['#mouse-tap-interval','tap
   mousePrefs[key]=Number(e.target.value);renderMousePrefs();
   try {localStorage.setItem(mousePrefKey,JSON.stringify(mousePrefs));$('#mouse-preference-status').textContent='Applied now · saved on this browser';}
   catch {$('#mouse-preference-status').textContent='Applied now · browser storage unavailable';}
+  $('#mouse-input-status').textContent=(key==='speed'?'Speed '+mousePrefs.speed.toFixed(2)+'×':'Tap window '+mousePrefs.tapMs+' ms')+' · '+$('#mouse-preference-status').textContent;
 });
 function mouseReady(ready) {$('#screen-mouse').dataset.ready=String(ready);$('#mouse-surface').setAttribute('aria-disabled',String(!ready));}
 let inputSequence=0;const awaitingInput=new Set();
@@ -379,6 +379,62 @@ $$('[data-edit]').forEach(el=>el.addEventListener('click',()=> {
   layouts.begin(el.dataset.edit);
 }));
 
+
+let keyboardReturn='home', keyboardMouseReturn='home';
+function currentWorkspace(){return SCREENS.find(s=>!$('#screen-'+s)?.hidden)||'home';}
+function releaseWorkspaceInputs(){padScreen?.releaseAll();padScreen?.stopMotion();mouseInput?.reset();mouseScroll?.reset();mouseMotion?.stop();state.session?.input?.reset();state.session?._releaseEverything();$$('[data-mod].active').forEach(el=>el.classList.remove('active'));}
+async function sendKeyboard(body){
+  if((currentWorkspace()==='remote'||(currentWorkspace()==='keyboard'&&keyboardReturn==='remote'))&&state.session?.viewOnly)throw Error('Remote screen is in View only mode. Turn it off before sending keys.');
+  return api('/api/keyboard',{method:'POST',body});
+}
+function openKeyboard(from=currentWorkspace()){
+  keyboardReturn=from;keyboardMouseReturn=mouseReturn;releaseWorkspaceInputs();
+  if(padScreen){padScreen.onExit=()=>{};padScreen.exit();padScreen=null;}
+  if(from==='mouse'){mouseAbort?.abort();mouseMotion?.stop();}
+  closeSheets();show('keyboard');
+}
+function closeKeyboard(){
+  $('#keyboard-draft').blur();
+  if(keyboardReturn==='mouse')openMouse(keyboardMouseReturn);
+  else if(keyboardReturn==='pad')openPad();
+  else if(keyboardReturn==='remote'&&state.session)show('remote');
+  else show('home');
+}
+keyboardWorkspace({send:sendKeyboard,onBack:closeKeyboard,onSettings:()=>openSettings('keyboard')});
+$('#tile-keyboard').addEventListener('click',()=>openKeyboard('home'));
+$('#mouse-keyboard').addEventListener('click',()=>openKeyboard('mouse'));
+$('#mouse-enter').addEventListener('click',async()=>{
+  const button=$('#mouse-enter');button.disabled=true;mouseInput?.reset();
+  try{await sendKeyboard({key:'Enter'});$('#mouse-input-status').textContent='Enter sent to PC';}
+  catch(e){$('#mouse-input-status').textContent=e.message;}
+  finally{button.disabled=false;}
+});
+const settingsNav=settingsNavigation({onClose:closeSheets,onAction:async action=>{
+  const from=currentWorkspace();closeSheets();
+  if(action==='keyboard'){openKeyboard(from);return;}
+  if(action==='layout-pad'){if(from!=='pad'||!padScreen)await openPad();$('#screen-pad [data-edit="pad"]').click();}
+  if(action==='layout-mouse'){if(from!=='mouse')await openMouse();mouseInput?.reset();layouts.begin('mouse');}
+}});
+let settingsFocus=null;
+async function openSettings(category=null){
+  settingsFocus=document.activeElement;releaseWorkspaceInputs();
+  openSheet('sheet-settings');settingsNav.select(category);$('#btn-save-settings').disabled=true;
+  $('#mouse-motion').disabled=!mouseMotion||!mouseInput||$('#screen-mouse').dataset.ready!=='true'||$('#screen-mouse').hidden;$('#mouse-center').disabled=$('#mouse-motion').disabled;
+  try{await loadSettings();$('#btn-save-settings').disabled=false;}catch(e){toast('Could not load PC settings: '+e.message,'err');}
+}
+$('#mouse-settings').addEventListener('click',()=>openSettings('mouse'));
+$('#pad-settings').addEventListener('click',()=>openSettings('gamepad'));
+$('#settings-gestures').addEventListener('click',()=>openSheet('sheet-gestures'));
+$('#settings-connect-motion').addEventListener('click',async()=>{closeSheets();await openMouse();await openSettings('motion');});
+try{const saved=Number(localStorage.getItem('pd-pad-motion-sensitivity'));if(saved>=.3&&saved<=2.5)$('#pad-sens').value=saved;}catch{}
+$('#pad-sens').addEventListener('input',e=>{const value=Number(e.target.value);if(padScreen)padScreen.settings.motionSensitivity=value;try{localStorage.setItem('pd-pad-motion-sensitivity',String(value));}catch{}});
+// Reserve actual dock height so controls never cover the remote picture by default.
+new ResizeObserver(()=>{
+  if($('#screen-remote').hidden)return;
+  const dock=$('#remote-dock').getBoundingClientRect();
+  $('#screen-remote').style.setProperty('--remote-dock-h',dock.height+'px');
+  $('#remote-stage').style.bottom=(dock.height+Math.max(8,innerHeight-dock.bottom)+4)+'px';
+}).observe($('#remote-dock'));
 
 /** Offer a real install button when the browser supports it. */
 (function installPrompt() {
@@ -921,7 +977,7 @@ $('#btn-scroll').addEventListener('click', () => {
 
 $('#btn-more').addEventListener('click', () => {
   const menu = $('#remote-menu');
-  menu.hidden = !menu.hidden;
+  menu.hidden = !menu.hidden;$('#btn-more').setAttribute('aria-expanded',String(!menu.hidden));
 });
 
 $('#btn-remote-back').addEventListener('click', closeRemote);
@@ -944,11 +1000,13 @@ $('#btn-remote-diag').addEventListener('click', showDiagnostics);
 
 $('#btn-remote-hide').addEventListener('click', () => {
   $('#screen-remote').classList.add('hide-ui');
+  $('#remote-dock').inert=true;$('#remote-bar').inert=true;
   $('#btn-show-bar').hidden = false;
 });
 $('#btn-show-bar').addEventListener('click', (ev) => {
   ev.stopPropagation();
   $('#screen-remote').classList.remove('hide-ui');
+  $('#remote-dock').inert=false;$('#remote-bar').inert=false;
   $('#btn-show-bar').hidden = true;
 });
 
@@ -965,6 +1023,8 @@ $('#remote-menu').addEventListener('click', async (ev) => {
       $('#kbd-proxy').focus({ preventScroll: true });
       break;
     }
+    case 'keyboard-page': menu.hidden=true;openKeyboard('remote');break;
+    case 'settings-page': menu.hidden=true;openSettings('display');break;
     case 'clipboard':
       menu.hidden = true;
       openSheet('sheet-clipboard');
@@ -1114,6 +1174,7 @@ function openSheet(id) {
 }
 
 function closeSheets() {
+  if(!$('#sheet-settings').hidden && settingsFocus?.getClientRects().length)settingsFocus.focus({preventScroll:true});
   $('#backdrop').hidden = true;
   $$('.sheet').forEach((s) => { s.hidden = true; });
 }
@@ -1306,7 +1367,7 @@ $('#btn-diag-vnc').addEventListener('click', () => restartScreenServer());
 
 $('#tile-screenshot').addEventListener('click', () => { openSheet('sheet-shot'); loadScreenshot(); });
 $('#tile-power').addEventListener('click', () => openSheet('sheet-power'));
-$('#tile-settings').addEventListener('click', async () => { openSheet('sheet-settings'); await loadSettings(); });
+$('#tile-settings').addEventListener('click',()=>openSettings());
 $('#tile-pair').addEventListener('click', () => { openSheet('sheet-pair'); loadPairing(); });
 
 $('#btn-home-refresh').addEventListener('click', () => { refreshInfo(); toast('Refreshed'); });
@@ -1316,7 +1377,7 @@ $$('.tab').forEach((tab) => tab.addEventListener('click', async () => {
   const which = tab.dataset.tab;
   if (which === 'home') return;
   if (which === 'screenshot') { openSheet('sheet-shot'); loadScreenshot(); }
-  if (which === 'settings') { openSheet('sheet-settings'); await loadSettings(); }
+  if (which === 'settings') await openSettings();
 }));
 
 $('#viewonly').addEventListener('change', applyViewOnly);
@@ -1390,7 +1451,8 @@ document.addEventListener('visibilitychange', () => {
 });
 
 window.addEventListener('popstate', () => {
-  if (!$('#screen-remote').hidden) closeRemote();
+  if (!$('#screen-keyboard').hidden) closeKeyboard();
+  else if (!$('#screen-remote').hidden) closeRemote();
   if (!$('#screen-pad').hidden) padScreen?.exit();
   if (!$('#screen-mouse').hidden) { mouseAbort?.abort(); mouseMotion?.stop(); show('home'); }
 });

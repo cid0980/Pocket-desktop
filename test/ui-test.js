@@ -186,7 +186,8 @@ function pointerPosition() {
 
   // repeated taps must each produce a button press and land on the right pixel
   const tapChecks = [];
-  for (const [tx, ty] of [[90, 360], [300, 500], [195, 330]]) {
+  const tapPoints=await cdpLib.evaluate(cdp,sessionId,`(()=>{const r=document.querySelector('#remote-host canvas').getBoundingClientRect();return [[.2,.3],[.8,.8],[.5,.15]].map(([x,y])=>[Math.round(r.left+r.width*x),Math.round(r.top+r.height*y)])})()`);
+  for (const [tx, ty] of tapPoints) {
     xdo('mousemove', '12', '12');
     await cdpLib.sleep(250);
     await cdpLib.evaluate(cdp, sessionId, `window.__pd.state.session.rfb && (window.__rm = [])`);

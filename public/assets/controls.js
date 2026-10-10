@@ -8,7 +8,8 @@ export async function fullscreen(toast) {
 }
 document.addEventListener('fullscreenchange', () => {
   document.querySelectorAll('[data-fullscreen]').forEach(b => {
-    b.textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen';
+    if(!b.hasAttribute('data-compact')) b.textContent=document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen';
+    b.setAttribute('aria-label',document.fullscreenElement ? 'Exit fullscreen':'Fullscreen');
     b.setAttribute('aria-pressed', String(!!document.fullscreenElement));
   });
 });

@@ -719,7 +719,7 @@ code {
 .pad-mouse { grid-row:7; gap:6px; }
 .pad-click { min-height:48px; height:52px; }
 .pad-panel { position:absolute; bottom:76px; left:12px; right:12px; grid-row:auto; }
-@media (orientation:landscape) and (min-width:620px) {
+@media (orientation:landscape) and (min-width:500px) {
  .pad-screen { grid-template-columns:1fr 1fr 1fr; grid-template-rows:44px 44px 44px minmax(70px,1fr) 52px; gap:6px; }
  .pad-top { grid-column:1/-1; }.pad-triggers,.pad-shoulders { grid-column:1/-1; }
  .pad-sticks { grid-column:1/-1; grid-row:4; min-height:70px; gap:30%; }
@@ -781,3 +781,144 @@ button:focus-visible,[tabindex]:focus-visible { outline:2px solid #78dcca; outli
  .mouse-motion-settings summary{padding:2px}
 }
 #mouse-scroll>span:nth-last-child(2){position:absolute;bottom:35px;left:0;right:0;text-align:center}
+
+/* v1.4: touch-first workspaces. Advanced controls live in one settings system. */
+:root { --muted:#a3b0c4;--accent-soft:rgba(77,171,247,.12); }
+button, a, input, textarea, select { -webkit-tap-highlight-color:transparent; }
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible { outline:3px solid var(--accent);outline-offset:3px; }
+button:disabled { opacity:.48;cursor:not-allowed; }
+.icon-btn,.pad-chip,.pill-btn,.chip,.menu-item,.segmented button { min-height:44px; }
+.icon-btn,.pad-chip { min-width:44px; }
+.tile-symbol { font-size:27px;color:var(--accent);line-height:1; }
+.control-top { flex-shrink:0;min-height:56px;display:flex;align-items:center;gap:8px;padding:8px max(12px,var(--safe-r)) 8px max(12px,var(--safe-l));border-bottom:1px solid var(--line); }
+.control-top strong { flex:1;min-width:0; }
+.workspace-intro .eyebrow,.settings-page .eyebrow { font-size:10px;letter-spacing:1.8px;color:var(--accent);font-weight:700; }
+/* One category at a time, with a stationary header and Save action. */
+.sheet.settings-page { top:var(--safe-t);bottom:0;max-height:none;width:100%;left:0;right:0;transform:none;border-radius:0;border:0; }
+.settings-page .sheet-head { flex-shrink:0;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line); }
+.settings-page .sheet-head>div { flex:1; }
+.settings-page .sheet-head h2 { font-size:22px;margin-top:3px; }
+.settings-body { flex:1;min-height:0;overscroll-behavior:contain;padding:16px;gap:0; }
+.settings-grid { display:grid;grid-template-columns:1fr;gap:8px; }
+.settings-grid>button { display:flex;align-items:center;text-align:left;gap:14px;padding:14px;border:1px solid var(--line);background:var(--bg);border-radius:14px;color:var(--text);font:inherit;min-height:74px;cursor:pointer; }
+.settings-grid>button:hover { border-color:var(--accent); }
+.settings-grid b { display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:var(--accent-soft);color:var(--accent);font-size:23px;font-weight:500; }
+.settings-grid span { flex:1;font-size:15px;font-weight:650; }
+.settings-grid small { display:block;font-weight:400;font-size:12px;color:var(--muted);margin-top:4px; }
+.settings-grid i { font-style:normal;color:var(--muted);font-size:24px; }
+.settings-category { display:flex;flex-direction:column;gap:20px;max-width:600px;width:100%;margin:0 auto; }
+.category-intro { color:var(--muted);line-height:1.6;font-size:14px;margin:0; }
+.settings-category>.btn { align-self:stretch; }
+.settings-category input:not([type=range]) { min-height:48px;font-size:16px; }
+.settings-category input[type=range] { min-height:44px;width:100%;accent-color:var(--accent); }
+.settings-category .field span { display:flex;justify-content:space-between;gap:12px; }
+.settings-category .field small { color:var(--muted);font-size:12px;line-height:1.6; }
+#gamepad-aim-settings .row { flex-direction:column;align-items:stretch;gap:12px; }
+.settings-save { display:flex;flex-shrink:0;align-items:center;justify-content:space-between;gap:16px;padding:12px 16px;border-top:1px solid var(--line);background:var(--panel);font-size:12px;color:var(--muted); }
+.settings-save .btn { white-space:nowrap; }
+#motion-settings-content .mouse-motion-settings { border:0;padding:0; }
+#motion-settings-content .mouse-motion-settings>summary { display:none; }
+#motion-settings-content .mouse-motion-settings>small { display:block;line-height:1.6;margin-top:12px; }
+#motion-settings-content #mouse-status { display:block;margin-top:14px;line-height:1.6; }
+/* Mousepad: speed on hand, motion/timing out of the gesture surface. */
+.mouse-head { gap:6px;min-height:56px; }
+.mouse-head strong { font-size:15px; }
+.mouse-head .pad-chip { flex-shrink:0; }
+#mouse-enter { color:var(--accent);background:var(--accent-soft);border-color:var(--accent);flex:.7; }
+.mouse-buttons { gap:10px; }
+.mouse-options { flex:none;display:grid;grid-template-columns:108px 1fr;gap:8px 16px;align-items:center;padding:10px 14px max(10px,var(--safe-b));max-height:none;overflow:visible; }
+.mouse-options>#mouse-keyboard { min-height:48px;padding:10px;font-size:13px; }
+.mouse-options>.mouse-speed-control { min-width:0; }
+.mouse-options>#mouse-preference-status { display:none; }
+.mouse-speed-control span { font-size:11px; }
+.mouse-speed-control input { min-height:36px; }
+.mouse-speed-control small { display:none; }
+/* Consistent key groups and explicit, IME-safe text submission. */
+.keyboard-screen { display:flex;flex-direction:column;background:var(--bg);padding-top:var(--safe-t); }
+.keyboard-body { width:100%;max-width:680px;margin:0 auto;padding:24px 18px max(24px,var(--safe-b));overflow-y:auto;overscroll-behavior:contain;min-height:0;display:flex;flex-direction:column;gap:16px; }
+.workspace-intro h1 { font-size:28px;font-weight:650;letter-spacing:-.7px;margin:7px 0; }
+.workspace-intro p { font-size:13px;color:var(--muted);line-height:1.6;margin:0;max-width:45ch; }
+.keyboard-compose { display:flex;flex-direction:column;gap:10px; }
+.keyboard-compose>span { display:flex;justify-content:space-between;font-size:13px;font-weight:600; }
+.keyboard-compose small { color:var(--muted);font-size:11px;font-weight:400; }
+.keyboard-compose textarea { font:inherit;font-size:16px;line-height:1.5;resize:vertical;width:100%;min-height:100px;max-height:35dvh;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--text);padding:14px; }
+.keyboard-send { display:grid;grid-template-columns:1fr 1fr;gap:10px; }
+.keyboard-send .btn { min-height:48px; }
+#keyboard-status { font-size:12px;line-height:1.5;color:var(--muted);min-height:18px;margin:0; }
+.keyboard-tabs { display:flex;gap:4px;padding:4px;background:var(--panel);border:1px solid var(--line);border-radius:12px; }
+.keyboard-tabs button { flex:1;min-width:0;border:0;background:transparent;color:var(--muted);font:inherit;font-size:12px;border-radius:8px;min-height:44px;cursor:pointer; }
+.keyboard-tabs button[aria-selected=true] { background:var(--accent-soft);color:var(--accent);font-weight:650; }
+.keyboard-key-group { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px; }
+.keyboard-key-group[data-key-panel=navigation] { grid-template-columns:repeat(4,minmax(0,1fr)); }
+.keyboard-key-group button { min-height:56px;padding:8px 4px;background:var(--panel);border:1px solid var(--line);border-radius:12px;color:var(--text);font:inherit;font-size:13px;cursor:pointer; }
+.keyboard-key-group button:active { background:var(--accent-soft);border-color:var(--accent); }
+.keyboard-key-group button[data-remote-key=Enter] { color:var(--accent);border-color:var(--accent); }
+/* Remote image and default dock occupy distinct regions, not competing layers. */
+#remote-bar { min-height:56px;gap:8px; }
+#remote-bar .icon-btn { width:44px;height:44px; }
+#remote-title { min-width:0; }
+#remote-title { overflow:hidden;white-space:nowrap;text-overflow:ellipsis; }
+.remote-dock { margin-inline:auto;width:calc(100% - 24px);max-width:760px;gap:6px;bottom:max(8px,var(--safe-b)); }
+.pillbar { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;border-radius:18px;width:100%;padding:6px; }
+.pillbar .pill-btn { width:auto;min-width:0;height:48px;min-height:48px;border-radius:12px;display:flex;flex-direction:column;justify-content:center;gap:2px;font-size:11px;padding:4px; }
+.pillbar .pill-btn svg { width:18px;height:18px; }
+.pillbar .pill-btn span { display:block; }
+#btn-remote-left,#btn-remote-right { font-size:12px; }
+#mod-row { max-width:100%;padding:4px 6px;border-radius:14px;gap:5px; }
+#mod-row .chip { min-width:44px;min-height:44px;flex-shrink:0; }
+#remote-stage { top:calc(var(--safe-t) + 68px); }
+#remote-menu { bottom:calc(var(--remote-dock-h,128px) + 12px);max-height:calc(100dvh - var(--remote-dock-h,128px) - 96px);overflow-y:auto;overscroll-behavior:contain; }
+#remote-menu .menu-item { min-height:46px; }
+/* Keep gaming actions large and separate even in short landscape viewports. */
+.pad-top { min-height:56px;gap:6px;padding-left:max(10px,var(--safe-l));padding-right:max(10px,var(--safe-r)); }
+.pad-chip.square { min-width:44px;width:44px; }
+.pad-system .pad-chip { min-height:44px; }
+.pad-shoulder { min-height:44px; }
+.pad-zone-label { pointer-events:none; }
+@media (min-width:700px) and (min-height:500px) {
+  .sheet.settings-page { top:5vh;bottom:5vh;left:50%;right:auto;transform:translateX(-50%);width:min(680px,90vw);border:1px solid var(--line);border-radius:24px;overflow:hidden; }
+  .settings-grid { grid-template-columns:1fr 1fr;gap:12px; }
+  .settings-grid>button { min-height:98px; }
+}
+@media (orientation:landscape) and (max-height:500px) {
+  #remote-bar { min-height:48px;top:var(--safe-t); }
+  #remote-stage { top:calc(var(--safe-t) + 52px); }
+  .pillbar { grid-template-columns:repeat(8,minmax(0,1fr)); }
+  .remote-dock { bottom:max(4px,var(--safe-b)); }
+  .pillbar .pill-btn { height:44px;min-height:44px;font-size:10px; }
+  .settings-grid { grid-template-columns:1fr 1fr; }
+  .settings-grid>button { min-height:68px;padding:9px; }
+  .settings-page .sheet-head { padding:6px 14px; }
+  .settings-page .sheet-head h2 { font-size:18px; }
+  .settings-page .eyebrow { display:none; }
+  .settings-body { padding:12px; }
+  .keyboard-body { padding:12px 18px;gap:10px;max-width:780px; }
+  .workspace-intro { display:none; }
+  .keyboard-compose textarea { min-height:76px; }
+  .keyboard-key-group button { min-height:44px; }
+  .mouse-head { min-height:48px;padding-top:2px;padding-bottom:2px; }
+  .mouse-options { grid-template-columns:108px 1fr;padding:4px 14px max(4px,var(--safe-b));gap:8px; }
+  .mouse-options>#mouse-keyboard { min-height:44px;padding:6px; }
+  .mouse-speed-control { display:grid;grid-template-columns:132px 1fr;align-items:center;gap:12px; }
+  .mouse-buttons .pad-click { min-height:44px; }
+  .pad-screen { gap:6px; }
+  .pad-top { min-height:48px;padding-top:0;padding-bottom:0; }
+}
+@media (max-width:380px) and (orientation:portrait) {
+  .mouse-head { gap:4px;padding-left:8px;padding-right:8px; }
+  .mouse-head strong { font-size:14px; }
+  .mouse-head .pad-chip { padding:6px 8px;font-size:11px; }
+  .mouse-options { grid-template-columns:100px 1fr;gap:10px;padding-left:10px;padding-right:10px; }
+}
+@media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important;transition:none!important;scroll-behavior:auto!important; } }
+
+#screen-remote.hide-ui #remote-stage { inset:0!important; }
+@media (orientation:landscape) and (min-width:500px) {
+ .pad-screen { grid-template-columns:1fr 196px 1fr; }
+ .pad-sticks { gap:208px; }
+ .pad-system .pad-chip { min-height:44px; }
+}
+
+#mouse-input-status { grid-column:1/-1; }
+#screen-remote #remote-stage { top:calc(var(--safe-t) + 64px); }
+@media (orientation:landscape) and (max-height:500px) { #screen-remote #remote-stage { top:calc(var(--safe-t) + 56px); } }

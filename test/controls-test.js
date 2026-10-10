@@ -7,7 +7,7 @@ const check=(name,ok)=>{ console.log(`${ok?'PASS':'FAIL'} ${name}`); ok?passed++
 const browser=await c.launchBrowser(); const cdp=await c.CDP.connect(browser.version.webSocketDebuggerUrl); const {sessionId:s}=await c.newPage(cdp);
 const ev=code=>c.evaluate(cdp,s,code); const click=selector=>ev(`document.querySelector(${JSON.stringify(selector)}).click()`);
 const wait=code=>c.waitFor(cdp,s,code,{timeout:15000}); const errors=[];
-cdp.on('Runtime.exceptionThrown',p=>errors.push(p.exceptionDetails?.text),s);
+cdp.on('Runtime.exceptionThrown',p=>errors.push(p.exceptionDetails?.exception?.description||p.exceptionDetails?.text),s);
 const port=process.env.PORT||8765;
 const viewport=async(w,h)=>cdp.send('Emulation.setDeviceMetricsOverride',{width:w,height:h,deviceScaleFactor:1,mobile:true},s);
 const box=selector=>ev(`(()=>{const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()`);
@@ -36,7 +36,7 @@ for(const page of ['mouse','pad','remote']) {
  if(page==='pad') {await click('#mouse-back');await wait("!!document.querySelector('#pad-move .pad-stick')");}
  if(page==='remote') {await click('#pad-exit');await ev('window.__pd.openRemote()');await wait("window.__pd.state.session?.connected");}
  const selector=page==='mouse'?'#mouse-left':page==='pad'?'#pad-look':'#remote-dock';
- await click(`[data-edit="${page}"]`); pt=await box(selector);
+ if(page==='mouse'){await click('#mouse-settings');await click('[data-workspace="layout-mouse"]');}else await click(`[data-edit="${page}"]`); pt=await box(selector);
  await touch('touchStart',pt); await touch('touchMove',{x:pt.x+22,y:pt.y-30});await touch('touchEnd');
  check(page+' layout drag creates separate draft',await ev(`Object.keys(pocketLayouts.draft.pages.${page}).length>0`));
  await ev("pocketLayouts.action('save')");

@@ -1,5 +1,28 @@
 # Pocket Desktop
 
+**v1.4.0 — touch-friendly workspaces, categorized settings and standalone keyboard.**
+
+- **Keyboard** is a home tile and a mousepad shortcut. Focus a field on the PC,
+  write a draft using your phone's native keyboard, then choose **Send text** or
+  **Send + Enter**. Essentials, navigation and shortcuts are separate key groups.
+  Text is not saved to browser storage or application logs. Failed sends keep the
+  draft; check the PC before retrying because a failed command can partly type.
+- **Mouse pad** now has an **Enter** button. Pointer speed stays on the main page;
+  tap timing, motion and layout customization are in its **⚙ Settings**.
+- **Settings** opens a category index, not one long form: Remote screen, Mouse pad,
+  Gamepad, Keyboard & voice, Phone motion, This device, Privacy & access, and Help
+  & diagnostics. Only one category is displayed. PC fields use **Save changes**;
+  local pointer/tap/aim controls apply immediately.
+- Gamepad and mouse controls have separated 44px+ targets at tested sizes. The
+  default remote dock is kept clear of the screen image. Existing custom layouts
+  are preserved; use the existing layout editor's Reset if you want defaults.
+- Standalone typing requires the PC's **X11 session**, `xdotool`, Python 3 and the
+  system X11 library (already part of the Linux setup). Unicode uses temporary
+  unused X keycodes, restored after each batch; it does not overwrite your
+  clipboard. Tested text includes Latin accents, Tamil and emoji. Application
+  support still varies. Wayland is explicitly unsupported.
+
+
 **See and control your Linux X11 PC from your phone** — over your own Wi-Fi, with no cloud service, no account and no npm dependencies.
 
 Open it on your phone, type a PIN, and you are looking at your real desktop: move the pointer, click, type with your phone's keyboard, scroll, zoom, take screenshots, send text to the PC clipboard, even lock/suspend the machine from bed.
@@ -97,7 +120,8 @@ node server.js --pair    # print a pairing QR in the terminal
 |---|---|
 | **Home** | live CPU / RAM / disk / uptime, VNC status, one big *Open remote screen* button, quick tiles for screenshot, power, pairing and settings |
 | **Remote** | your desktop. Bottom pill: keyboard, input mode, scroll toggle, ⋯ menu |
-| **Settings** | PC name, streaming quality (Sharp / Balanced / Fast), VNC password, push-to-talk key, sign out |
+| **Keyboard** | Standalone text drafts, Send/Send + Enter, special keys and shortcuts |
+| **Settings** | Category index; PC changes need Save, local control preferences apply immediately |
 
 ### Gestures
 
@@ -177,7 +201,7 @@ access. See PORTABLE.md for the graphical-session and reboot limitations.
 ### Mouse pad and remote clicks
 
 Swipe immediately to move; tap once for left-click, or tap twice for right-click.
-The visible **Double-tap window** slider selects **250–350 ms** (default **300 ms**).
+The **Settings → Mouse pad → Double-tap window** slider selects **250–350 ms** (default **300 ms**).
 A single tap waits that interval before committing; a valid second tap cancels it.
 Tap clicks use a **60 ms press on the PC**, so even frame-polled input can observe
 them; drag input still uses independent button-down, movement and button-up events.
@@ -224,7 +248,7 @@ from the uinput touchpad buttons. Remote display space is reserved above the doc
 
 ### Layout editor
 
-Choose **Edit layout** in the gamepad header, or **Settings → Customize gamepad
+Choose **Edit layout** in the gamepad header, or **Settings → Gamepad → Customize gamepad
 layout**, then drag an outlined control or control group. The other workspaces
 retain their Layout buttons. The same editor and saved settings are reused. Normal use
 cannot reposition anything. The editor toolbar itself can be moved by its heading
@@ -270,7 +294,7 @@ a dead zone and bounded, time-scaled movement. Backgrounding or leaving stops it
 The ordinary touchpad remains usable without motion or HTTPS.
 
 A trusted HTTPS origin also enables service workers and browser PWA installation.
-Settings shows an Install button only when the browser supplies an install prompt.
+Settings → This device shows an Install button only when the browser supplies an install prompt.
 On iOS use Share → Add to Home Screen. Fullscreen API availability varies; on
 unsupported browsers the app explains the limitation instead of pretending it entered.
 Adding a home-screen shortcut on HTTP is not the same as installing a full PWA.
@@ -289,7 +313,7 @@ Replace the files, then restart the services so the new code is actually running
 systemctl --user restart pocket-desktop pocket-desktop-vnc
 ```
 
-Or use **Settings → Restart server** in the app (works with the installed service; if you
+Or use **Settings → Help & diagnostics → Run diagnostics → Restart server** in the app (works with the installed service; if you
 started it by hand with `./run.sh`, the app tells you to start it again).
 
 If the files on disk are newer than the running process, the app notices and shows an
@@ -422,7 +446,7 @@ If the line says `NOT managed by this app`, press **Restart screen server** in t
   means the screen server exited (check the log) or Wi-Fi dropped.
 * Disable screen blanking on the PC; when the display sleeps, some setups stop updating VNC.
   `Settings → Power` in Ubuntu, or `xset s off -dpms`.
-* Use **Settings → quality: Fast** on weak Wi-Fi.
+* Use **Settings → Remote screen → Fast** on weak Wi-Fi.
 
 ## Troubleshooting
 
@@ -445,7 +469,7 @@ x11vnc can only capture X11. Log out, click the gear ⚙ on the login screen, ch
 
 **Does it start without logging in?** The services are user services; the installer enables *lingering* so they come up with the machine. The desktop itself still needs to be logged in — the app captures your session, not the login greeter.
 
-**Everything is slow or laggy.** Settings → quality *Fast*, and/or rotate the phone to landscape.
+**Everything is slow or laggy.** Settings → Remote screen → *Fast*, and/or rotate the phone to landscape.
 
 ---
 

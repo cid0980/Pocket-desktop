@@ -21,7 +21,7 @@ const c=require('./cdp'),{execFileSync}=require('child_process');
  const pt=await ev("(()=>{const r=document.querySelector('#mouse-surface').getBoundingClientRect();return{x:r.x+90,y:r.y+r.height/2,id:1}})()");
 
  const place=async(selector)=>{
-  const p=await de(`(()=>{const r=document.querySelector('${selector}').getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2}})()`);
+  const p=await de(`(()=>{const r=document.querySelector('${selector}').getBoundingClientRect();return{x:screenX+(outerWidth-innerWidth)/2+r.x+r.width/2,y:screenY+outerHeight-innerHeight+r.y+r.height/2}})()`);
   execFileSync('xdotool',['mousemove',String(Math.round(p.x)),String(Math.round(p.y))],{env:{...process.env,DISPLAY:':98'}});await c.sleep(80);
  };
  const tap=async()=>{await touch('touchStart',[pt]);await c.sleep(45);await touch('touchEnd');};
@@ -42,6 +42,10 @@ const c=require('./cdp'),{execFileSync}=require('child_process');
 
  await de("window.wheelEvents=[];window.wheelTrace=e=>wheelEvents.push({dy:e.deltaY,x:e.clientX,y:e.clientY,target:e.target.tagName,trusted:e.isTrusted});document.addEventListener('wheel',window.wheelTrace,{passive:true})");await place('#scroller');await de("document.querySelector('#scroller').scrollTop=800;new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))");
  const strip=await ev("(()=>{const r=document.querySelector('#mouse-scroll').getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2,id:2}})()");
+ // XTEST placement switches X input devices. Seed the evdev smooth-scroll
+ // baseline once before measuring; this rig does not assert that first event.
+ await touch('touchStart',[strip]);await touch('touchMove',[{...strip,y:strip.y-20}]);await touch('touchEnd');await c.sleep(180);
+ await de("document.querySelector('#scroller').scrollTop=800;wheelEvents=[];new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))");
  const pointer=()=>execFileSync('xdotool',['getmouselocation','--shell'],{env:{...process.env,DISPLAY:':98'},encoding:'utf8'}).split('SCREEN')[0];
  for(const [name,dy]of [['up',-45],['down',45]]){
   const before=await de("document.querySelector('#scroller').scrollTop"),oldPointer=pointer();
@@ -53,7 +57,7 @@ const c=require('./cdp'),{execFileSync}=require('child_process');
  await c.screenshot(phone,ps,require('path').join(__dirname,'artifacts','70-mousepad-speed-scroll.png'));
  const position=async()=>{
   await de('getSelection().removeAllRanges();inputEvents=[]');
-  const r=await de("(()=>{const r=document.querySelector('#text').getBoundingClientRect();return{x:r.left+2,y:r.top+r.height/2}})()");
+  const r=await de("(()=>{const r=document.querySelector('#text').getBoundingClientRect();return{x:screenX+(outerWidth-innerWidth)/2+r.left+2,y:screenY+outerHeight-innerHeight+r.top+r.height/2}})()");
   execFileSync('xdotool',['mousemove',String(Math.round(r.x)),String(Math.round(r.y))],{env:{...process.env,DISPLAY:process.env.SELECTION_DISPLAY||':98'}});
   await c.sleep(100);
  };

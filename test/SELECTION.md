@@ -36,3 +36,13 @@ changing pointer position. It waits for rendering after positioning that element
 Run `BASELINE=1 ... test/mouse-desktop-test.js` against an older server/frontend to
 print the tap result for comparison; baseline mode deliberately does not assert
 that the old implementation passes.
+
+### v1.4 fixture notes
+
+The mouse test accounts for the headed browser's screen position and top chrome
+when placing the real pointer. Prefer a fresh profile and `--kiosk` for a stable
+controlled target. The rig positions the cursor with XTEST, then uses the app's
+actual evdev mouse. It seeds one smooth-scroll stroke before resetting scrollTop
+to 800 and measuring up/down; this avoids treating X-device baseline initialization
+as application scrolling. The first wheel event after switching X devices is not
+covered by these assertions. No application wheel code was changed for this.
