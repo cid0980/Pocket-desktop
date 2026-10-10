@@ -17,7 +17,8 @@ not your active PC session. It is not part of normal installation or unattended 
    `DISPLAY=:98 chromium --no-sandbox --disable-dev-shm-usage --disable-gpu --user-data-dir=/tmp/pd-selection-test --remote-debugging-port=9339 --window-position=0,0 --window-size=1280,800 --kiosk file:///absolute/path/to/test/selection-target.html`
    Disabling Chromium's sandbox is only for this disposable root/container test rig.
 6. With the app on port 8765 and test PIN 1234:
-   `node --experimental-websocket test/selection-test.js`.
+   `node --experimental-websocket test/mouse-desktop-test.js`.
+   The smaller `selection-test.js` still runs the selection-only checks.
 
 The test drives the phone UI through touch emulation. Its only direct XTEST action
 positions the remote pointer at the start of the line before each scenario. All
@@ -28,3 +29,10 @@ select actual text, and retain the highlight after release and free pointer moti
 
 `PORT` and `SELECTION_DISPLAY` can override the app port and target display.
 A physical phone is still required to verify real-device touch ergonomics.
+
+The expanded test also checks single/double taps, dedicated clicks, a frame-sampled
+held-button state, and actual scrolling of the target's scrollable element without
+changing pointer position. It waits for rendering after positioning that element.
+Run `BASELINE=1 ... test/mouse-desktop-test.js` against an older server/frontend to
+print the tap result for comparison; baseline mode deliberately does not assert
+that the old implementation passes.

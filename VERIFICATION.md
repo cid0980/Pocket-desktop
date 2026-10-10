@@ -1,3 +1,80 @@
+# Mousepad pipeline revision — v1.3.3
+
+Verified 2026-10-10. This is a targeted input-path update, not a UI-only change.
+
+## Investigation before the change
+
+- The touchpad used a fixed 1.5 multiplier. Its visible Sensitivity slider only
+  changed DeviceOrientation motion gain, explaining why it did not change swipes.
+- The pad explicitly converted multiple contacts and native wheel events to wheel
+  messages. Both forwarding paths have now been removed from the pad.
+- The tap helper sent down and up immediately. In the baseline headed-desktop test,
+  a normal button DID receive one click, but a frame-sampled held-button check
+  never observed the press. This is a reproduced timing weakness, **not proof of
+  the exact cause of missing taps on the user's physical phone**.
+- Sending while a socket was unavailable returned no failure indication. The new
+  UI waits for connection readiness, checks frontend/server version agreement,
+  reports failed sends, and displays input acknowledgements from the PC.
+
+## What changed
+
+Tap arbitration is still based on Pointer Events, starting coordinates, movement
+thresholds, and a delayed single tap—not click/dblclick compatibility events. The
+interval is now configurable from 250–350 ms (300 default). Tap clicks use a new
+`{t:'click',b:'left'|'right',id}` message; the PC emits down, holds it for 60 ms,
+then emits up. Dedicated buttons and drag gestures retain `{t:'btn',d:1|0}` and
+relative pointer messages. Pulse timers cooperate with independently held buttons
+and are cleared on disconnect/lease expiry. Every output still goes through the
+same Python uinput helper, with separate SYN reports.
+
+The right-side one-finger strip sends wheel input only. The pad does not scroll
+with multiple contacts or native wheel events. Pointer Speed is 0.20×–2.00×,
+default 0.60×, with fractional accumulation. It is applied once to relative deltas,
+not to scroll/clicks; both speed and tap interval persist locally. OS-level mouse
+acceleration is outside this app's multiplier and may still affect the desktop.
+
+## Current verification
+
+- **51 gesture/kernel checks**: taps, double/triple taps, configurable intervals,
+  dedicated buttons, real held drag, cancellation/leave/link-loss release, no
+  two-finger scroll, no forwarded pad wheel, strip direction and pointer isolation,
+  concurrent pad movement and strip scroll, immediate speed changes and display,
+  persistence and restored effective gain, fractional precision, layout editing.
+- **16 headed-desktop checks** (`mouse-desktop-test.js`): normal click target
+  activated exactly once; double tap generated right-click only; dedicated clicks
+  activated the target; frame polling observed the press; actual target event
+  timestamps showed **60 ms** between down/up. The strip scrolled real content
+  **800 → 560 → 800**, while the pointer stayed at **402,492**. Both drag methods
+  selected text and preserved the highlight after release and free movement.
+- Regression runs: **56** gamepad/kernel, **41** browser controls/import/export,
+  **25** existing remote UI, **45** API, **13** restart, **12** uinput, **14** installer
+  checks passed. Geometry was checked at 390×844, 360×640, 844×390 and 568×320;
+  a pad/click-row overlap found in the first landscape screenshot was corrected.
+
+One initial desktop scroll check returned unchanged scrollTop. Subsequent tests
+added wheel-event observation and waited for the target's rendering after setting
+its initial scroll position; repeated runs passed in both directions. No claim is
+made that a physical-device problem was diagnosed from that initial test failure.
+
+## Limits and acceptance semantics
+
+No physical Android/iOS touchscreen was available. The phone side used Chromium
+CDP touch emulation, including an insecure HTTP origin; the PC side used a real
+uinput mouse connected to Xorg's evdev driver and headed Chromium. Native target
+input was not synthesized through DOM or target CDP mouse commands. This is real
+PC-side integration testing, but not physical-phone acceptance.
+
+“PC accepted” confirms a command was submitted to the input helper, not that every
+application/game acted on it. Actual target behavior is separately checked by the
+headed test. Silent network loss has an approximately four-second release lease.
+The exact original missing-normal-tap symptom on the user's phone remains unverified.
+If it persists, collect the phone browser/version, the displayed app version and
+whether the input status changes to Sending / PC accepted / a connection error.
+
+The earlier release reports below are historical, not repeated claims for this build.
+
+---
+
 # Mouse gestures and layout repair — v1.3.2
 
 Verified 2026-10-10 in Debian/Linux, Chromium, Xvfb and a separate Xorg dummy display

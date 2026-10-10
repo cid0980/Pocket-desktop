@@ -176,16 +176,41 @@ access. See PORTABLE.md for the graphical-session and reboot limitations.
 
 ### Mouse pad and remote clicks
 
-Swipe immediately to move; tap once for left-click, or tap twice within **280 ms**
-for right-click. A single tap waits 280 ms so a double tap does not also left-click.
-Small motion under 8 CSS pixels is tolerated while tapping.
+Swipe immediately to move; tap once for left-click, or tap twice for right-click.
+The visible **Double-tap window** slider selects **250–350 ms** (default **300 ms**).
+A single tap waits that interval before committing; a valid second tap cancels it.
+Tap clicks use a **60 ms press on the PC**, so even frame-polled input can observe
+them; drag input still uses independent button-down, movement and button-up events.
 
-**To select text or drag:** hold one finger still on the pad for **350 ms**, then
-move it. The pad turns green while the real left mouse button is held. Lift to
-release; the selection remains. Alternatively, hold the dedicated Left/Right
-button with one finger and move on the pad with another. With a desktop mouse,
-hover movement moves the pointer; pressing and moving drags. Two fingers or the
-mouse wheel scroll. Drags suppress pending taps; immediate swipes never click.
+**To select text or drag:** hold still on the pad for **400 ms**, then move. The
+pad turns green while the real left mouse button is held. Lift to release; the
+selection remains. Alternatively, hold the dedicated Left/Right button with one
+finger and move on the pad with another. With a desktop mouse, hover movement
+moves the pointer; pressing and moving drags. Drags suppress pending taps.
+
+**There is no two-finger scrolling on the mousepad.** Multiple pad contacts are
+ignored until lifted. Use the distinct **vertical scroll strip at the right**:
+drag upward to scroll up, downward to scroll down. It emits wheel events only,
+not pointer movement. It also supports up/down arrow keys and a physical mouse
+wheel while over the strip. Native wheel events over the pad are not forwarded,
+so a laptop trackpad cannot reintroduce two-finger scrolling there. This change
+is specific to the standalone mousepad, not the separate remote-screen gestures.
+
+**Pointer Speed** now controls touchpad movement, not motion sensors. Range:
+**0.20×–2.00×**, default **0.60×** (previously hardcoded 1.50×). The displayed value
+updates immediately, applies to subsequent movement, and is saved locally with
+the double-tap window. Small fractional movements accumulate rather than being
+rounded away. There is no app acceleration or second backend speed multiplier;
+your Linux desktop can still apply its own system-level mouse acceleration.
+Motion sensitivity is a separate setting under Optional motion controls.
+
+Input is disabled until the control channel is ready. Click/button/wheel responses
+show **PC accepted** feedback. This confirms that the server submitted the command
+to its input helper, not that an arbitrary application acted on it. The integration
+tests separately verify actual native events and target application behavior.
+Missing acknowledgements and mismatched running-server/frontend versions are
+reported, rather than silently dropping taps. After an update, restart the PC
+process as well as refreshing the phone page.
 
 Buttons release on cancellation, leaving the pad, backgrounding, layout editing,
 navigation and detected connection loss. A server-side heartbeat lease releases

@@ -184,10 +184,19 @@ export function bindMouseButton(el, button, send, signal) {
 
 /** One owner for surface gestures and dedicated buttons. All output uses the
  * existing btn/down/up + relative-pointer protocol, never synthetic click-only drag.
- * Touch: early swipe = move; 350ms stationary hold = left drag; tap wait = 280ms.
+ * Touch: early swipe = move; 400ms stationary hold = left drag; configurable tap window.
  */
-export function bindTouchpad(el, send, signal) {
-  const TAP_MS=280, HOLD_MS=350, SLOP=8, DOUBLE_RADIUS=28;
+export function bindTouchpad(el, send, signal, options = {}) {
+  const tapMs = () => Math.max(250, Math.min(350, Number(options.tapMs?.()) || 300));
+  const speed = () => Math.max(.2, Math.min(2, Number(options.speed?.()) || .6));
+  const HOLD_MS=400, SLOP=10, DOUBLE_RADIUS=32;
+  let fractionX=0, fractionY=0;
+  const move = (dx,dy) => {
+    fractionX += dx*speed(); fractionY += dy*speed();
+    const x=Math.trunc(fractionX),y=Math.trunc(fractionY);
+    fractionX-=x;fractionY-=y;
+    if(x||y)send({t:'ptr',dx:x,dy:y});
+  };
   const points=new Map(), held=new Map(), buttonEls=new Map(), resetters=new Set();
   let pending=null, holdTimer=null, hover=null;
   const on=(target,type,fn,extra={})=>target.addEventListener(type,fn,{signal,...extra});
@@ -201,9 +210,10 @@ export function bindTouchpad(el, send, signal) {
   };
   const cancelTap=()=>{if(pending)clearTimeout(pending.timer);pending=null;};
   const cancelHold=()=>{clearTimeout(holdTimer);holdTimer=null;};
-  const click=button=>{const owner=Symbol('tap');set(owner,button,true);set(owner,button,false);};
+  // Taps are timed at the PC, not as back-to-back down/up packets.
+  const click=button=>{if(!anyHeld())send({t:'click',b:button});};
   const reset=()=>{
-    cancelTap();cancelHold();points.clear();hover=null;
+    cancelTap();cancelHold();points.clear();hover=null;fractionX=fractionY=0;
     for(const [owner,button]of [...held])set(owner,button,false);
     for(const button of buttonEls.keys())button.classList.remove('down');
     for(const fn of resetters)fn();
@@ -212,15 +222,16 @@ export function bindTouchpad(el, send, signal) {
   const outside=e=>{const r=el.getBoundingClientRect();return e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom;};
   on(el,'pointerdown',e=>{
     if(e.pointerType==='mouse' && ![0,2].includes(e.button))return;
-    e.preventDefault();el.setPointerCapture(e.pointerId);hover=null;
+    e.preventDefault();try{el.setPointerCapture(e.pointerId);}catch{}hover=null;
+    fractionX=fractionY=0;
     let second=false; const prior=pending;
     if(pending) {
-      second=performance.now()-pending.at<=TAP_MS&&Math.hypot(e.clientX-pending.x,e.clientY-pending.y)<=DOUBLE_RADIUS;
+      second=performance.now()-pending.at<=tapMs()&&Math.hypot(e.clientX-pending.x,e.clientY-pending.y)<=DOUBLE_RADIUS;
       cancelTap();
     }
     const p={x:e.clientX,y:e.clientY,ox:e.clientX,oy:e.clientY,at:performance.now(),mode:anyHeld()?'external':'tap',second,first:!!prior&&!second,button:e.button===2?'right':'left',type:e.pointerType};
     points.set(e.pointerId,p);
-    if(points.size>1){cancelHold();cancelTap();for(const q of points.values())q.mode='scroll';if(held.has('surface'))set('surface',held.get('surface'),false);return;}
+    if(points.size>1){cancelHold();cancelTap();for(const q of points.values())q.mode='ignored';if(held.has('surface'))set('surface',held.get('surface'),false);return;}
     if(p.mode==='tap') holdTimer=setTimeout(()=>{
       if(points.get(e.pointerId)!==p||p.mode!=='tap')return;
       cancelTap();p.mode='drag';set('surface',p.button,true);
@@ -229,7 +240,7 @@ export function bindTouchpad(el, send, signal) {
   on(el,'pointermove',e=>{
     const p=points.get(e.pointerId);
     if(!p) {
-      if(e.pointerType==='mouse'&&!e.buttons){if(hover)send({t:'ptr',dx:Math.round((e.clientX-hover.x)*1.5),dy:Math.round((e.clientY-hover.y)*1.5)});hover={x:e.clientX,y:e.clientY};}
+      if(e.pointerType==='mouse'&&!e.buttons){if(hover)move(e.clientX-hover.x,e.clientY-hover.y);hover={x:e.clientX,y:e.clientY};}
       return;
     }
     e.preventDefault();if(outside(e)){reset();return;}
@@ -238,25 +249,25 @@ export function bindTouchpad(el, send, signal) {
       if(Math.hypot(e.clientX-p.ox,e.clientY-p.oy)<=SLOP)return;
       cancelTap();cancelHold();
       if(p.type==='mouse'){p.mode='drag';set('surface',p.button,true);}else p.mode='move';
-      dx=e.clientX-p.ox;dy=e.clientY-p.oy;
+      // Do not replay the tap dead-zone as a jump when movement starts.
     }
-    if(p.mode==='scroll'){if(dy)send({t:'wheel',d:Math.sign(-dy)});}
-    else if(dx||dy)send({t:'ptr',dx:Math.round(dx*1.5),dy:Math.round(dy*1.5)});
+    if(p.mode!=='ignored'&&(dx||dy))move(dx,dy);
   });
   on(el,'pointerup',e=>{
     const p=points.get(e.pointerId);if(!p)return;
     e.preventDefault();points.delete(e.pointerId);cancelHold();
     if(p.mode==='tap'&&performance.now()-p.at<HOLD_MS&&!outside(e)&&!anyHeld()) {
       if(p.second||p.button==='right')click('right');
-      else {if(p.first)click('left');const tap={at:performance.now(),x:e.clientX,y:e.clientY};tap.timer=setTimeout(()=>{if(pending===tap){pending=null;click('left');}},TAP_MS);pending=tap;}
+      else {if(p.first)click('left');const tap={at:performance.now(),x:e.clientX,y:e.clientY};tap.timer=setTimeout(()=>{if(pending===tap){pending=null;click('left');}},tapMs());pending=tap;}
     } else if(p.mode==='drag'||p.mode==='external')reset();
-    // No remaining finger from a scroll gesture is reclassified as a tap.
+    // Multi-touch on the pad is ignored until all contacts lift. No scroll gesture.
   });
-  on(el,'pointercancel',reset);
-  on(el,'pointerleave',e=>{if(points.has(e.pointerId)||anyHeld())reset();else hover=null;});
+  on(el,'pointercancel',e=>{if(points.has(e.pointerId))reset();});
+  on(el,'pointerleave',e=>{if((points.has(e.pointerId)||anyHeld())&&outside(e))reset();else hover=null;});
   on(el,'lostpointercapture',e=>{if(points.has(e.pointerId))reset();});
   on(el,'contextmenu',e=>e.preventDefault());
-  on(el,'wheel',e=>{e.preventDefault();cancelTap();send({t:'wheel',d:Math.sign(-e.deltaY)});},{passive:false});
+  // Native trackpad wheel events must not reintroduce two-finger scrolling.
+  on(el,'wheel',e=>e.preventDefault(),{passive:false});
   on(window,'blur',reset);on(window,'pd:control-lost',reset);
   on(document,'visibilitychange',()=>{if(document.hidden)reset();});
   signal.addEventListener('abort',reset,{once:true});
@@ -275,5 +286,28 @@ export function bindTouchpad(el, send, signal) {
     on(document,'visibilitychange',()=>{if(document.hidden)pointer=null;});
     signal.addEventListener('abort',()=>pointer=null,{once:true});
   };
-  return {reset,bindButton};
+  return {reset,bindButton,cancelPending:cancelTap};
+}
+
+/** Independent one-finger scroll strip. Upward drag -> positive Linux wheel. */
+export function bindScrollStrip(el, send, signal, cancelPending = () => {}) {
+  let pointer=null,lastY=0,remainder=0,originY=0;
+  const thumb=el.querySelector('.scroll-thumb');
+  const on=(type,fn,extra={})=>el.addEventListener(type,fn,{signal,...extra});
+  const reset=()=>{pointer=null;remainder=0;thumb.style.transform='translateY(0px)';el.setAttribute('aria-valuenow','0');el.classList.remove('active');};
+  on('pointerdown',e=>{if(pointer!==null)return;cancelPending();pointer=e.pointerId;lastY=originY=e.clientY;el.setPointerCapture(pointer);el.classList.add('active');e.preventDefault();});
+  on('pointermove',e=>{
+    if(e.pointerId!==pointer)return;e.preventDefault();
+    remainder+=(lastY-e.clientY)/18;lastY=e.clientY;
+    const wheel=Math.trunc(remainder);remainder-=wheel;if(wheel)send({t:'wheel',d:Math.max(-8,Math.min(8,wheel))});
+    const limit=Math.max(1,(el.clientHeight-70)/2),offset=Math.max(-limit,Math.min(limit,e.clientY-originY));
+    thumb.style.transform=`translateY(${offset}px)`;el.setAttribute('aria-valuenow',String(Math.round(-offset/limit*100)));
+  });
+  for(const event of ['pointerup','pointercancel','lostpointercapture'])on(event,e=>{if(e.pointerId===pointer)reset();});
+  on('keydown',e=>{if(e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();send({t:'wheel',d:e.key==='ArrowUp'?1:-1});}});
+  on('wheel',e=>{e.preventDefault();send({t:'wheel',d:Math.sign(-e.deltaY)});},{passive:false});
+  on('contextmenu',e=>e.preventDefault());
+  window.addEventListener('pd:control-lost',reset,{signal});window.addEventListener('blur',reset,{signal});
+  signal.addEventListener('abort',reset,{once:true});
+  return {reset};
 }

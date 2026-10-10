@@ -306,7 +306,7 @@
 
       <div class="pad-panel" id="pad-panel">
         <button class="btn" data-edit="pad">Customize gamepad layout</button>
-        <p class="muted small">v1.3.2 · Move outlined controls, then Save. Cancel keeps your previous layout.</p>
+        <p class="muted small">v1.3.3 · Move outlined controls, then Save. Cancel keeps your previous layout.</p>
         <label class="row between">
           <span>Aim sensitivity</span>
           <input type="range" id="pad-sens" min="0.3" max="2.5" step="0.1" value="1">
@@ -319,9 +319,18 @@
 
 <section id="screen-mouse" class="screen mouse-screen" hidden>
   <header class="control-top"><button class="pad-chip" id="mouse-back">Back</button><strong>Mouse pad</strong><button class="pad-chip" data-fullscreen>Fullscreen</button><button class="pad-chip" data-edit="mouse">Layout</button></header>
-  <div id="mouse-surface" data-layout="surface" tabindex="0" role="region" aria-label="Remote touchpad"><strong>Slide to move</strong><span>Tap: left click · Double tap: right click<br>Hold 350 ms, then move to drag · Swipe to move<br>Two fingers to scroll · Or hold a click button below</span></div>
+  <div class="mouse-workspace">
+    <div id="mouse-surface" data-layout="surface" tabindex="0" role="region" aria-label="Remote touchpad"><strong>Slide to move</strong><span>Tap: left click · Double tap: right click<br>Hold 400 ms, then move to drag<br>One finger to move · Scroll using the strip →</span></div>
+    <div id="mouse-scroll" role="slider" tabindex="0" aria-label="Scroll vertically: drag up or down" aria-orientation="vertical" aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0"><span>▲</span><span class="scroll-thumb">↕</span><span>SCROLL</span><span>▼</span></div>
+  </div>
   <div class="mouse-clicks"><button id="mouse-left" data-layout="left" class="pad-click">Left click</button><button id="mouse-right" data-layout="right" class="pad-click">Right click</button></div>
-  <footer class="mouse-options"><button class="pad-chip" id="mouse-motion">Enable motion</button><button class="pad-chip" id="mouse-center">Re-centre</button><label>Sensitivity <input id="mouse-sens" type="range" min="0.3" max="3" step="0.1" value="1"></label><p id="mouse-status" role="status">Touch controls ready. Motion is optional.</p></footer>
+  <footer class="mouse-options">
+    <label class="mouse-pref" for="mouse-speed"><span>Pointer Speed <output id="mouse-speed-value">0.60×</output></span><span class="speed-range">Slow <input id="mouse-speed" type="range" min="0.2" max="2" step="0.05" value="0.6"> Fast</span></label>
+    <label class="mouse-pref" for="mouse-tap-interval"><span>Double-tap window <output id="mouse-tap-value">300 ms</output></span><input id="mouse-tap-interval" type="range" min="250" max="350" step="10" value="300"></label>
+    <p id="mouse-preference-status" role="status">Settings apply immediately · v1.3.3</p>
+    <p id="mouse-input-status" role="status">Connecting to PC…</p>
+    <details class="mouse-motion-settings"><summary>Optional motion controls</summary><button class="pad-chip" id="mouse-motion">Enable motion</button><button class="pad-chip" id="mouse-center">Re-centre</button><label>Motion sensitivity <input id="mouse-sens" type="range" min="0.3" max="3" step="0.1" value="1"></label><p id="mouse-status" role="status">Motion is optional; it does not change touchpad speed.</p></details>
+  </footer>
 </section>
 <!-- ───────────────────────── sheets ───────────────────────── -->
 <div class="sheet-backdrop" id="backdrop" hidden></div>

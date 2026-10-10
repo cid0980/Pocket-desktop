@@ -2,7 +2,7 @@
 
 import { RemoteSession } from './remote.js';
 import './pad.js';
-import { LayoutEditor, fullscreen, MotionPointer, bindMouseButton, bindTouchpad } from './controls.js';
+import { LayoutEditor, fullscreen, MotionPointer, bindMouseButton, bindTouchpad, bindScrollStrip } from './controls.js';
 
 /* ── tiny helpers ──────────────────────────────────────────────── */
 
@@ -10,7 +10,7 @@ const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
 
 /** Keep in sync with VERSION in lib/config.js — a test asserts they match. */
-const CLIENT_VERSION = '1.3.2';
+const CLIENT_VERSION = '1.3.3';
 
 /**
  * Session token store. Normally the session lives in an HttpOnly cookie, but
@@ -190,12 +190,14 @@ class ControlSocket {
       }
       ws.onopen = () => {
         this.ws = ws;
+        window.dispatchEvent(new Event('pd:control-ready'));
         this.retries = 0;
         clearInterval(this.heartbeat);
         this.heartbeat = setInterval(() => this.raw({t:'ping'}), 750);
         for (const msg of this.queue.splice(0)) this.raw(msg);
         resolve(this);
       };
+      ws.onmessage = e => { try { const message=JSON.parse(e.data); if(message.t==='ack')window.dispatchEvent(new CustomEvent('pd:control-ack',{detail:message})); } catch {} };
       ws.onerror = () => { /* onclose follows */ };
       ws.onclose = () => {
         clearInterval(this.heartbeat);
@@ -215,11 +217,12 @@ class ControlSocket {
   }
 
   raw(obj) {
-    if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify(obj));
-    // Never replay stale input after reconnecting.
+    if (this.ws && this.ws.readyState === 1) {try {this.ws.send(JSON.stringify(obj));return true;}catch{}}
+    // Never replay stale input after reconnecting. Report a failed send.
+    return false;
   }
 
-  send(obj) { this.raw(obj); }
+  send(obj) { return this.raw(obj); }
 
   close() {
     clearInterval(this.heartbeat);
@@ -283,29 +286,71 @@ async function openPad() {
 
 $('#tile-pad').addEventListener('click', openPad);
 
-let mouseAbort = null, mouseMotion = null, mouseInput = null, mouseReturn = 'home';
+let mouseAbort = null, mouseMotion = null, mouseInput = null, mouseScroll = null, mouseReturn = 'home';
+const mousePrefKey='pd-mouse-preferences-v1';
+let mousePrefs={version:1,speed:.6,tapMs:300};
+try {const saved=JSON.parse(localStorage.getItem(mousePrefKey));if(saved?.version===1) {
+  if(Number.isFinite(saved.speed)&&saved.speed>=.2&&saved.speed<=2)mousePrefs.speed=saved.speed;
+  if(Number.isFinite(saved.tapMs)&&saved.tapMs>=250&&saved.tapMs<=350)mousePrefs.tapMs=saved.tapMs;
+}}catch{}
+function renderMousePrefs() {
+  $('#mouse-speed').value=mousePrefs.speed;$('#mouse-speed-value').textContent=mousePrefs.speed.toFixed(2)+'×';
+  $('#mouse-tap-interval').value=mousePrefs.tapMs;$('#mouse-tap-value').textContent=mousePrefs.tapMs+' ms';
+}
+renderMousePrefs();
+for(const [selector,key]of [['#mouse-speed','speed'],['#mouse-tap-interval','tapMs']])$(selector).addEventListener('input',e=>{
+  mousePrefs[key]=Number(e.target.value);renderMousePrefs();
+  try {localStorage.setItem(mousePrefKey,JSON.stringify(mousePrefs));$('#mouse-preference-status').textContent='Applied now · saved on this browser';}
+  catch {$('#mouse-preference-status').textContent='Applied now · browser storage unavailable';}
+});
+function mouseReady(ready) {$('#screen-mouse').dataset.ready=String(ready);$('#mouse-surface').setAttribute('aria-disabled',String(!ready));}
+let inputSequence=0;const awaitingInput=new Set();
+function sendMouseInput(message) {
+  message={...message,id:++inputSequence};
+  if(!controlSocket?.send(message)){mouseReady(false);$('#mouse-input-status').textContent='Not connected — input was not sent';return false;}
+  awaitingInput.add(message.id);if(awaitingInput.size>128)awaitingInput.delete(awaitingInput.values().next().value);
+  if(message.t==='click')$('#mouse-input-status').textContent='Sending '+message.b+' tap…';
+  if(message.t==='click'||message.t==='btn')setTimeout(()=>{
+    if(!awaitingInput.has(message.id))return;
+    awaitingInput.clear();mouseInput?.reset();mouseReady(false);
+    $('#mouse-input-status').textContent='PC did not confirm input. Reopen Mouse pad; check the PC server version and connection.';
+  },3000);
+  return true;
+}
+window.addEventListener('pd:control-ack',e=>{
+  const m=e.detail;if(!awaitingInput.delete(m.id))return;
+  if(!m.ok){$('#mouse-input-status').textContent='PC could not accept input — reopen Mouse pad';mouseReady(false);return;}
+  if(m.event==='click'||m.event==='btn')$('#mouse-input-status').textContent='PC accepted '+m.button+(m.event==='click'?' click':' button event');
+  if(m.event==='wheel')$('#mouse-input-status').textContent='PC accepted scroll';
+});
+window.addEventListener('pd:control-ready',()=>{if(mouseInput&&!$('#screen-mouse').hidden){mouseReady(true);$('#mouse-input-status').textContent='Connected — input ready';}});
+
 async function openMouse(from = 'home') {
   mouseReturn = from;
   if (padScreen) { padScreen.onExit = () => {}; padScreen.exit(); padScreen = null; }
-  mouseAbort?.abort(); mouseMotion?.stop();
+  mouseAbort?.abort(); mouseMotion?.stop();mouseInput=null;awaitingInput.clear();
+  mouseReady(false);$('#mouse-input-status').textContent='Connecting to PC…';
   show('mouse');
   try {
+    if(state.auth?.version && state.auth.version!==CLIENT_VERSION)throw Error('PC server and phone files have different versions. Restart the PC app, then reload this page before using Mouse pad.');
     const {data} = await api('/api/pad/start', {method:'POST'});
     if(!data?.available) throw Error(data?.error || 'Virtual mouse is unavailable; run install.sh on the PC.');
     if(!controlSocket?.ws) { controlSocket = new ControlSocket({onClose:()=>toast('Pointer disconnected. Reopen Mouse pad to reconnect.','err')}); await controlSocket.connect(); }
     mouseAbort = new AbortController(); const signal = mouseAbort.signal;
-    const send = msg => controlSocket.send(msg);
-    mouseInput = bindTouchpad($('#mouse-surface'),send,signal);
+    const send = sendMouseInput;
+    mouseInput = bindTouchpad($('#mouse-surface'),send,signal,{speed:()=>mousePrefs.speed,tapMs:()=>mousePrefs.tapMs});
+    mouseScroll=bindScrollStrip($('#mouse-scroll'),send,signal,()=>mouseInput.cancelPending());
     mouseInput.bindButton($('#mouse-left'),'left'); mouseInput.bindButton($('#mouse-right'),'right');
-    mouseMotion = new MotionPointer(send,(text,on)=> { $('#mouse-status').textContent=text; $('#mouse-motion').textContent=on?'Disable motion':'Enable motion'; },()=>Number($('#mouse-sens').value));
-  } catch(e) { $('#mouse-status').textContent=e.message; toast(e.message,'err'); }
+    mouseReady(true);$('#mouse-input-status').textContent='Connected — input ready';
+    mouseMotion = new MotionPointer(msg=>controlSocket.send(msg),(text,on)=> { $('#mouse-status').textContent=text; $('#mouse-motion').textContent=on?'Disable motion':'Enable motion'; },()=>Number($('#mouse-sens').value));
+  } catch(e) { $('#mouse-input-status').textContent=e.message; $('#mouse-status').textContent=e.message; toast(e.message,'err'); }
 }
 $('#tile-mouse').addEventListener('click',()=>openMouse());
 $('#pad-exit').addEventListener('click',()=>{ if(!padScreen)show('home'); });
 $('#pad-to-mouse').addEventListener('click',()=>openMouse('pad'));
 $('#mouse-back').addEventListener('click',()=> {mouseAbort?.abort();mouseMotion?.stop();mouseMotion=null;if(mouseReturn==='pad')openPad();else show('home');});
 $('#mouse-motion').addEventListener('click',()=>mouseMotion?.toggle());
-window.addEventListener('pd:control-lost',()=>{mouseInput?.reset();mouseMotion?.stop();padScreen?.releaseAll();});
+window.addEventListener('pd:control-lost',()=>{mouseReady(false);awaitingInput.clear();$('#mouse-input-status').textContent='Connection lost — reconnecting';mouseInput?.reset();mouseMotion?.stop();padScreen?.releaseAll();});
 $('#mouse-center').addEventListener('click',()=>mouseMotion?.recenter());
 $$('[data-fullscreen]').forEach(el=>el.addEventListener('click',()=>fullscreen(toast)));
 
@@ -329,7 +374,7 @@ $$('[data-edit]').forEach(el=>el.addEventListener('click',()=> {
   padScreen?.releaseAll(); padScreen?.motionController.stop(); mouseMotion?.stop();
   state.session?.input?.reset();
   for(const b of ['left','right']) controlSocket?.send({t:'btn',b,d:0});
-  mouseInput?.reset();
+  mouseInput?.reset();mouseScroll?.reset();
   $('#pad-panel')?.classList.remove('open');
   layouts.begin(el.dataset.edit);
 }));

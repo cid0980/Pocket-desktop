@@ -32,7 +32,7 @@ const c=require('./cdp'),{execFileSync}=require('child_process');
    button=await ev("(()=>{const r=document.querySelector('#mouse-left').getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2,id:2}})()");
    await touch('touchStart',[button]);await touch('touchStart',[button,pt]);
   }
-  for(let dx=20;dx<=170;dx+=20){await touch('touchMove',[...(button?[button]:[]),{...pt,x:pt.x+dx}]);await c.sleep(30);}
+  for(let dx=20;dx<=380;dx+=20){await touch('touchMove',[...(button?[button]:[]),{...pt,x:pt.x+dx}]);await c.sleep(30);}
   await touch('touchEnd');await c.sleep(350);
   const result=await de("({text:getSelection().toString(),events:inputEvents})");console.log(mode+' selected:',JSON.stringify(result.text));
   check(mode+' selects real text',result.text.length>=10);

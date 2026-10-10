@@ -680,6 +680,7 @@ function handleControlSocket(req, socket, head) {
 
   let windowStart = Date.now();
   let windowCount = 0;
+  const pulses=new Map(),requestedButtons=new Set();
 
   client.on('message', (buf, isBinary) => {
     if (isBinary) return;                      // control channel is JSON text
@@ -693,7 +694,25 @@ function handleControlSocket(req, socket, head) {
     } catch {
       return;
     }
-    applyControlMessage(msg, pad);
+    const ack = ok => { if(Number.isSafeInteger(msg.id))client.send(JSON.stringify({t:'ack',id:msg.id,event:msg.t,button:msg.b,ok:Boolean(ok)}),{binary:false}); };
+    if(msg.t==='click' && ['left','right','middle'].includes(msg.b)) {
+      // A 60ms PC-side pulse remains visible to frame-polled applications even
+      // when network delivery coalesces messages. Never use this path for drags.
+      if(pulses.has(msg.b)||requestedButtons.has(msg.b)){ack(false);return;}
+      const down=pad.mouseButton(msg.b,true);
+      if(!down){ack(false);return;}
+      pulses.set(msg.b,setTimeout(()=>{
+        pulses.delete(msg.b);
+        const up=requestedButtons.has(msg.b)||pad.mouseButton(msg.b,false);
+        ack(up);
+      },60));
+      return;
+    }
+    if(msg.t==='btn' && ['left','right','middle'].includes(msg.b)) {
+      if(msg.d)requestedButtons.add(msg.b);else requestedButtons.delete(msg.b);
+      ack(pad.mouseButton(msg.b,Boolean(msg.d)||pulses.has(msg.b)));return;
+    }
+    ack(applyControlMessage(msg, pad));
   });
 
   // A dead Wi-Fi link can leave TCP open for minutes. A short input lease
@@ -701,6 +720,7 @@ function handleControlSocket(req, socket, head) {
   let lastControlActivity = Date.now();
   client.on('message', () => { lastControlActivity = Date.now(); });
   const releaseInputs = () => {
+    for(const timer of pulses.values())clearTimeout(timer);pulses.clear();requestedButtons.clear();
     pad.sendBatch([
       'a lx 0', 'a ly 0', 'a rx 0', 'a ry 0', 'a lt 0', 'a rt 0', 'a dx 0', 'a dy 0',
       'p a 0', 'p b 0', 'p x 0', 'p y 0', 'p lb 0', 'p rb 0', 'p lt 0', 'p rt 0',
@@ -751,8 +771,7 @@ function applyControlMessage(msg, pad) {
     }
 
     case 'ptr':
-      pad.mouseMove(msg.dx, msg.dy);
-      return;
+      return pad.mouseMove(msg.dx, msg.dy);
 
     case 'btn':
       if (['left', 'middle', 'right', '1', '2', '3'].includes(msg.b)) {
@@ -761,8 +780,7 @@ function applyControlMessage(msg, pad) {
       return;
 
     case 'wheel':
-      pad.wheel(msg.d);
-      return;
+      return pad.wheel(msg.d);
 
     default:
       return;
