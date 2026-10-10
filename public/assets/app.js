@@ -10,7 +10,7 @@ const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
 
 /** Keep in sync with VERSION in lib/config.js — a test asserts they match. */
-const CLIENT_VERSION = '1.3.1';
+const CLIENT_VERSION = '1.3.2';
 
 /**
  * Session token store. Normally the session lives in an HttpOnly cookie, but
@@ -191,11 +191,15 @@ class ControlSocket {
       ws.onopen = () => {
         this.ws = ws;
         this.retries = 0;
+        clearInterval(this.heartbeat);
+        this.heartbeat = setInterval(() => this.raw({t:'ping'}), 750);
         for (const msg of this.queue.splice(0)) this.raw(msg);
         resolve(this);
       };
       ws.onerror = () => { /* onclose follows */ };
       ws.onclose = () => {
+        clearInterval(this.heartbeat);
+        window.dispatchEvent(new Event('pd:control-lost'));
         this.ws = null;
         if (this.retries < 3) {
           this.retries += 1;
@@ -218,6 +222,7 @@ class ControlSocket {
   send(obj) { this.raw(obj); }
 
   close() {
+    clearInterval(this.heartbeat);
     try { this.ws?.close(); } catch { /* ignore */ }
     this.ws = null;
   }
@@ -278,7 +283,7 @@ async function openPad() {
 
 $('#tile-pad').addEventListener('click', openPad);
 
-let mouseAbort = null, mouseMotion = null, mouseReturn = 'home';
+let mouseAbort = null, mouseMotion = null, mouseInput = null, mouseReturn = 'home';
 async function openMouse(from = 'home') {
   mouseReturn = from;
   if (padScreen) { padScreen.onExit = () => {}; padScreen.exit(); padScreen = null; }
@@ -290,8 +295,8 @@ async function openMouse(from = 'home') {
     if(!controlSocket?.ws) { controlSocket = new ControlSocket({onClose:()=>toast('Pointer disconnected. Reopen Mouse pad to reconnect.','err')}); await controlSocket.connect(); }
     mouseAbort = new AbortController(); const signal = mouseAbort.signal;
     const send = msg => controlSocket.send(msg);
-    bindTouchpad($('#mouse-surface'),send,signal);
-    bindMouseButton($('#mouse-left'),'left',send,signal); bindMouseButton($('#mouse-right'),'right',send,signal);
+    mouseInput = bindTouchpad($('#mouse-surface'),send,signal);
+    mouseInput.bindButton($('#mouse-left'),'left'); mouseInput.bindButton($('#mouse-right'),'right');
     mouseMotion = new MotionPointer(send,(text,on)=> { $('#mouse-status').textContent=text; $('#mouse-motion').textContent=on?'Disable motion':'Enable motion'; },()=>Number($('#mouse-sens').value));
   } catch(e) { $('#mouse-status').textContent=e.message; toast(e.message,'err'); }
 }
@@ -300,6 +305,7 @@ $('#pad-exit').addEventListener('click',()=>{ if(!padScreen)show('home'); });
 $('#pad-to-mouse').addEventListener('click',()=>openMouse('pad'));
 $('#mouse-back').addEventListener('click',()=> {mouseAbort?.abort();mouseMotion?.stop();mouseMotion=null;if(mouseReturn==='pad')openPad();else show('home');});
 $('#mouse-motion').addEventListener('click',()=>mouseMotion?.toggle());
+window.addEventListener('pd:control-lost',()=>{mouseInput?.reset();mouseMotion?.stop();padScreen?.releaseAll();});
 $('#mouse-center').addEventListener('click',()=>mouseMotion?.recenter());
 $$('[data-fullscreen]').forEach(el=>el.addEventListener('click',()=>fullscreen(toast)));
 
@@ -323,6 +329,8 @@ $$('[data-edit]').forEach(el=>el.addEventListener('click',()=> {
   padScreen?.releaseAll(); padScreen?.motionController.stop(); mouseMotion?.stop();
   state.session?.input?.reset();
   for(const b of ['left','right']) controlSocket?.send({t:'btn',b,d:0});
+  mouseInput?.reset();
+  $('#pad-panel')?.classList.remove('open');
   layouts.begin(el.dataset.edit);
 }));
 

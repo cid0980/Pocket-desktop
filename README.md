@@ -176,9 +176,21 @@ access. See PORTABLE.md for the graphical-session and reboot limitations.
 
 ### Mouse pad and remote clicks
 
-Slide one finger to move; use two fingers or the mouse wheel to scroll. Ordinary
-movement never clicks. The dedicated Left/Right buttons support hold-and-drag:
-hold a click button with one finger and move on the surface with another.
+Swipe immediately to move; tap once for left-click, or tap twice within **280 ms**
+for right-click. A single tap waits 280 ms so a double tap does not also left-click.
+Small motion under 8 CSS pixels is tolerated while tapping.
+
+**To select text or drag:** hold one finger still on the pad for **350 ms**, then
+move it. The pad turns green while the real left mouse button is held. Lift to
+release; the selection remains. Alternatively, hold the dedicated Left/Right
+button with one finger and move on the pad with another. With a desktop mouse,
+hover movement moves the pointer; pressing and moving drags. Two fingers or the
+mouse wheel scroll. Drags suppress pending taps; immediate swipes never click.
+
+Buttons release on cancellation, leaving the pad, backgrounding, layout editing,
+navigation and detected connection loss. A server-side heartbeat lease releases
+inputs on a silent link failure after approximately 4 seconds. Do not depend on
+instant release when the network disappears; the PC needs time to detect it.
 Pointer events provide one input path without duplicate touch/mouse handlers.
 
 Remote screen Left/Right clicks go through the existing RFB session at its last
@@ -187,7 +199,9 @@ from the uinput touchpad buttons. Remote display space is reserved above the doc
 
 ### Layout editor
 
-Choose **Layout**, then drag an outlined control or control group. Normal use
+Choose **Edit layout** in the gamepad header, or **Settings → Customize gamepad
+layout**, then drag an outlined control or control group. The other workspaces
+retain their Layout buttons. The same editor and saved settings are reused. Normal use
 cannot reposition anything. The editor toolbar itself can be moved by its heading
 if it covers a control. **Save** stores positions in this browser; **Cancel**
 restores the last saved layout. **Reset page** and **Reset all** modify the draft;

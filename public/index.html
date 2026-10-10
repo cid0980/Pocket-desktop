@@ -257,7 +257,7 @@
     <section id="screen-pad" class="screen pad-screen" hidden>
       <header class="pad-top">
         <button class="pad-chip" id="pad-exit" title="Back">✕</button>
-        <button class="pad-chip" id="pad-to-mouse">Mouse pad</button><button class="pad-chip" data-fullscreen>Fullscreen</button><button class="pad-chip" data-edit="pad">Layout</button><div class="pad-status"><span class="dot" id="pad-dot"></span><span id="pad-title">Gamepad</span></div>
+        <button class="pad-chip" id="pad-to-mouse">Mouse pad</button><button class="pad-chip" data-fullscreen>Fullscreen</button><button class="pad-chip" data-edit="pad" aria-label="Edit gamepad layout">Edit layout</button><div class="pad-status"><span class="dot" id="pad-dot"></span><span id="pad-title">Gamepad</span></div>
         <button class="pad-chip" id="pad-settings" title="Settings">⚙</button>
       </header>
 
@@ -305,6 +305,8 @@
       </div>
 
       <div class="pad-panel" id="pad-panel">
+        <button class="btn" data-edit="pad">Customize gamepad layout</button>
+        <p class="muted small">v1.3.2 · Move outlined controls, then Save. Cancel keeps your previous layout.</p>
         <label class="row between">
           <span>Aim sensitivity</span>
           <input type="range" id="pad-sens" min="0.3" max="2.5" step="0.1" value="1">
@@ -317,7 +319,7 @@
 
 <section id="screen-mouse" class="screen mouse-screen" hidden>
   <header class="control-top"><button class="pad-chip" id="mouse-back">Back</button><strong>Mouse pad</strong><button class="pad-chip" data-fullscreen>Fullscreen</button><button class="pad-chip" data-edit="mouse">Layout</button></header>
-  <div id="mouse-surface" data-layout="surface" tabindex="0" role="region" aria-label="Remote touchpad"><strong>Slide to move</strong><span>Two fingers to scroll · use the buttons below to click</span></div>
+  <div id="mouse-surface" data-layout="surface" tabindex="0" role="region" aria-label="Remote touchpad"><strong>Slide to move</strong><span>Tap: left click · Double tap: right click<br>Hold 350 ms, then move to drag · Swipe to move<br>Two fingers to scroll · Or hold a click button below</span></div>
   <div class="mouse-clicks"><button id="mouse-left" data-layout="left" class="pad-click">Left click</button><button id="mouse-right" data-layout="right" class="pad-click">Right click</button></div>
   <footer class="mouse-options"><button class="pad-chip" id="mouse-motion">Enable motion</button><button class="pad-chip" id="mouse-center">Re-centre</button><label>Sensitivity <input id="mouse-sens" type="range" min="0.3" max="3" step="0.1" value="1"></label><p id="mouse-status" role="status">Touch controls ready. Motion is optional.</p></footer>
 </section>

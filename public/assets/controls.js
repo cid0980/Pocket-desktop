@@ -79,7 +79,7 @@ export class LayoutEditor {
     }
     try { const raw = localStorage.getItem(this.key); if (raw) this.saved = this.validate(JSON.parse(raw)); }
     catch { toast('Saved layouts were unreadable or outdated; using defaults.'); }
-    this.draft = structuredClone(this.saved);
+    this.draft = JSON.parse(JSON.stringify(this.saved));
     this.panel = document.createElement('div'); this.panel.className = 'layout-editor'; this.panel.hidden = true;
     this.panel.innerHTML = '<strong tabindex="0">Layout editor · drag this heading to move toolbar</strong><div><button data-op="save">Save</button><button data-op="cancel">Cancel</button><button data-op="reset">Reset page</button><button data-op="all">Reset all</button><button data-op="export">Export JSON</button><button data-op="import">Import JSON</button></div><input type="file" accept="application/json,.json" hidden><p role="status">Changes are not saved yet.</p>';
     document.body.append(this.panel);
@@ -100,7 +100,7 @@ export class LayoutEditor {
       } catch(err) { this.message('Import rejected: '+err.message); }
       e.target.value='';
     });
-    this.resize = () => this.apply(); window.addEventListener('resize',this.resize);
+    this.resize = () => { this.apply(); if(this.editing) this.panel.style.cssText=''; }; window.addEventListener('resize',this.resize);
     window.visualViewport?.addEventListener('resize',this.resize);
     this.apply();
   }
@@ -118,10 +118,13 @@ export class LayoutEditor {
     } return out;
   }
   begin(page) {
-    this.page=page; this.editing=true; this.draft=structuredClone(this.saved);
-    this.panel.hidden=false; this.pages[page].classList.add('layout-editing'); this.message('Changes are not saved yet.');
+    if(this.editing) return;
+    this.panel.style.cssText='';
+    this.page=page; this.editing=true; this.draft=JSON.parse(JSON.stringify(this.saved));
+    this.panel.hidden=false; this.pages[page].classList.add('layout-editing'); this.pages[page].querySelectorAll('[data-edit]').forEach(b=>b.setAttribute('aria-pressed','true')); this.message('Changes are not saved yet.');
   }
   message(text) { this.panel.querySelector('p').textContent=text; }
+  topInset(page) { return page==='pad' ? Math.max(8, this.pages.pad.querySelector('.pad-top').getBoundingClientRect().bottom+8) : 8; }
   down(e,page) {
     if(!this.editing || page!==this.page) return;
     e.preventDefault(); e.stopImmediatePropagation();
@@ -132,8 +135,9 @@ export class LayoutEditor {
   move(e) {
     const d=this.drag; if(!d || e.pointerId!==d.pointer) return;
     e.preventDefault(); e.stopImmediatePropagation();
-    const w=innerWidth-d.el.offsetWidth-16,h=innerHeight-d.el.offsetHeight-16;
-    this.draft.pages[d.page][d.id]={x:Math.max(0,Math.min(1,(e.clientX-d.ox-8)/Math.max(1,w))),y:Math.max(0,Math.min(1,(e.clientY-d.oy-8)/Math.max(1,h)))};
+    const top=this.topInset(d.page);
+    const w=innerWidth-d.el.offsetWidth-16,h=innerHeight-d.el.offsetHeight-top-8;
+    this.draft.pages[d.page][d.id]={x:Math.max(0,Math.min(1,(e.clientX-d.ox-8)/Math.max(1,w))),y:Math.max(0,Math.min(1,(e.clientY-d.oy-top)/Math.max(1,h)))};
     this.apply(); this.message('Unsaved changes');
   }
   apply() {
@@ -144,8 +148,9 @@ export class LayoutEditor {
       for(const [id,el] of Object.entries(nodes)) {
         const pos=this.draft.pages[page][id]; if(!pos) continue;
         const size=sizes[id];
-        const width=Math.min(size.width,innerWidth-16),height=Math.min(size.height,innerHeight-16);
-        Object.assign(el.style,{width:width+'px',height:height+'px',position:'fixed',right:'auto',bottom:'auto',transform:'none',margin:'0',zIndex:'12',left:(8+pos.x*Math.max(0,innerWidth-width-16))+'px',top:(8+pos.y*Math.max(0,innerHeight-height-16))+'px'});
+        const top=this.topInset(page);
+        const width=Math.min(size.width,innerWidth-16),height=Math.min(size.height,innerHeight-top-8);
+        Object.assign(el.style,{width:width+'px',height:height+'px',position:'fixed',right:'auto',bottom:'auto',transform:'none',margin:'0',zIndex:'12',left:(8+pos.x*Math.max(0,innerWidth-width-16))+'px',top:(top+pos.y*Math.max(0,innerHeight-height-top-8))+'px'});
       }
     }
   }
@@ -156,7 +161,7 @@ export class LayoutEditor {
       try { const valid=this.validate(this.draft); localStorage.setItem(this.key,JSON.stringify(valid)); this.saved=valid; this.toast('Layouts saved on this browser'); this.finish(); }
       catch(e) { this.message('Could not save: '+e.message); }
     }
-    if(op==='cancel') { this.draft=structuredClone(this.saved); this.apply(); this.finish(); }
+    if(op==='cancel') { this.draft=JSON.parse(JSON.stringify(this.saved)); this.apply(); this.finish(); }
     if(op==='import') this.panel.querySelector('input').click();
     if(op==='export') {
       const url=URL.createObjectURL(new Blob([JSON.stringify(this.draft,null,2)],{type:'application/json'}));
@@ -164,7 +169,7 @@ export class LayoutEditor {
       this.message('Exported current layout draft.');
     }
   }
-  finish() { this.editing=false; this.drag=null; this.panel.hidden=true; Object.values(this.pages).forEach(r=>r.classList.remove('layout-editing')); }
+  finish() { this.editing=false; this.drag=null; this.panel.hidden=true; Object.values(this.pages).forEach(r=>{r.classList.remove('layout-editing');r.querySelectorAll('[data-edit]').forEach(b=>b.setAttribute('aria-pressed','false'));}); }
 }
 
 export function bindMouseButton(el, button, send, signal) {
@@ -177,17 +182,98 @@ export function bindMouseButton(el, button, send, signal) {
   signal?.addEventListener('abort',up,{once:true});
 }
 
-export function bindTouchpad(el,send,signal) {
-  const points=new Map();
-  el.addEventListener('pointerdown',e=>{el.setPointerCapture(e.pointerId);points.set(e.pointerId,{x:e.clientX,y:e.clientY});e.preventDefault();},{signal});
-  el.addEventListener('pointermove',e=>{
+/** One owner for surface gestures and dedicated buttons. All output uses the
+ * existing btn/down/up + relative-pointer protocol, never synthetic click-only drag.
+ * Touch: early swipe = move; 350ms stationary hold = left drag; tap wait = 280ms.
+ */
+export function bindTouchpad(el, send, signal) {
+  const TAP_MS=280, HOLD_MS=350, SLOP=8, DOUBLE_RADIUS=28;
+  const points=new Map(), held=new Map(), buttonEls=new Map(), resetters=new Set();
+  let pending=null, holdTimer=null, hover=null;
+  const on=(target,type,fn,extra={})=>target.addEventListener(type,fn,{signal,...extra});
+  const anyHeld=()=>held.size>0;
+  const set=(owner,button,down)=>{
+    const was=[...held.values()].includes(button);
+    if(down) held.set(owner,button); else held.delete(owner);
+    const now=[...held.values()].includes(button);
+    if(was!==now) send({t:'btn',b:button,d:now?1:0});
+    el.classList.toggle('dragging',anyHeld());
+  };
+  const cancelTap=()=>{if(pending)clearTimeout(pending.timer);pending=null;};
+  const cancelHold=()=>{clearTimeout(holdTimer);holdTimer=null;};
+  const click=button=>{const owner=Symbol('tap');set(owner,button,true);set(owner,button,false);};
+  const reset=()=>{
+    cancelTap();cancelHold();points.clear();hover=null;
+    for(const [owner,button]of [...held])set(owner,button,false);
+    for(const button of buttonEls.keys())button.classList.remove('down');
+    for(const fn of resetters)fn();
+    el.classList.remove('dragging');
+  };
+  const outside=e=>{const r=el.getBoundingClientRect();return e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom;};
+  on(el,'pointerdown',e=>{
+    if(e.pointerType==='mouse' && ![0,2].includes(e.button))return;
+    e.preventDefault();el.setPointerCapture(e.pointerId);hover=null;
+    let second=false; const prior=pending;
+    if(pending) {
+      second=performance.now()-pending.at<=TAP_MS&&Math.hypot(e.clientX-pending.x,e.clientY-pending.y)<=DOUBLE_RADIUS;
+      cancelTap();
+    }
+    const p={x:e.clientX,y:e.clientY,ox:e.clientX,oy:e.clientY,at:performance.now(),mode:anyHeld()?'external':'tap',second,first:!!prior&&!second,button:e.button===2?'right':'left',type:e.pointerType};
+    points.set(e.pointerId,p);
+    if(points.size>1){cancelHold();cancelTap();for(const q of points.values())q.mode='scroll';if(held.has('surface'))set('surface',held.get('surface'),false);return;}
+    if(p.mode==='tap') holdTimer=setTimeout(()=>{
+      if(points.get(e.pointerId)!==p||p.mode!=='tap')return;
+      cancelTap();p.mode='drag';set('surface',p.button,true);
+    },HOLD_MS);
+  });
+  on(el,'pointermove',e=>{
+    const p=points.get(e.pointerId);
+    if(!p) {
+      if(e.pointerType==='mouse'&&!e.buttons){if(hover)send({t:'ptr',dx:Math.round((e.clientX-hover.x)*1.5),dy:Math.round((e.clientY-hover.y)*1.5)});hover={x:e.clientX,y:e.clientY};}
+      return;
+    }
+    e.preventDefault();if(outside(e)){reset();return;}
+    let dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;
+    if(p.mode==='tap') {
+      if(Math.hypot(e.clientX-p.ox,e.clientY-p.oy)<=SLOP)return;
+      cancelTap();cancelHold();
+      if(p.type==='mouse'){p.mode='drag';set('surface',p.button,true);}else p.mode='move';
+      dx=e.clientX-p.ox;dy=e.clientY-p.oy;
+    }
+    if(p.mode==='scroll'){if(dy)send({t:'wheel',d:Math.sign(-dy)});}
+    else if(dx||dy)send({t:'ptr',dx:Math.round(dx*1.5),dy:Math.round(dy*1.5)});
+  });
+  on(el,'pointerup',e=>{
     const p=points.get(e.pointerId);if(!p)return;
-    const dx=e.clientX-p.x,dy=e.clientY-p.y; points.set(e.pointerId,{x:e.clientX,y:e.clientY});
-    if(points.size===1) send({t:'ptr',dx:Math.round(dx*1.5),dy:Math.round(dy*1.5)});
-    else if(dy) send({t:'wheel',d:Math.sign(-dy)});
-    e.preventDefault();
-  },{signal});
-  for(const event of ['pointerup','pointercancel','lostpointercapture']) el.addEventListener(event,e=>points.delete(e.pointerId),{signal});
-  el.addEventListener('wheel',e=>{e.preventDefault();send({t:'wheel',d:Math.sign(-e.deltaY)});},{signal,passive:false});
-  el.addEventListener('contextmenu',e=>e.preventDefault(),{signal});
+    e.preventDefault();points.delete(e.pointerId);cancelHold();
+    if(p.mode==='tap'&&performance.now()-p.at<HOLD_MS&&!outside(e)&&!anyHeld()) {
+      if(p.second||p.button==='right')click('right');
+      else {if(p.first)click('left');const tap={at:performance.now(),x:e.clientX,y:e.clientY};tap.timer=setTimeout(()=>{if(pending===tap){pending=null;click('left');}},TAP_MS);pending=tap;}
+    } else if(p.mode==='drag'||p.mode==='external')reset();
+    // No remaining finger from a scroll gesture is reclassified as a tap.
+  });
+  on(el,'pointercancel',reset);
+  on(el,'pointerleave',e=>{if(points.has(e.pointerId)||anyHeld())reset();else hover=null;});
+  on(el,'lostpointercapture',e=>{if(points.has(e.pointerId))reset();});
+  on(el,'contextmenu',e=>e.preventDefault());
+  on(el,'wheel',e=>{e.preventDefault();cancelTap();send({t:'wheel',d:Math.sign(-e.deltaY)});},{passive:false});
+  on(window,'blur',reset);on(window,'pd:control-lost',reset);
+  on(document,'visibilitychange',()=>{if(document.hidden)reset();});
+  signal.addEventListener('abort',reset,{once:true});
+  const bindButton=(button,name)=>{
+    buttonEls.set(button,name);let pointer=null;resetters.add(()=>pointer=null);
+    const up=e=>{if(pointer===null||(e&&e.pointerId!==pointer))return;pointer=null;button.classList.remove('down');set(button,name,false);};
+    on(button,'pointerdown',e=>{
+      if(pointer!==null)return;
+      cancelTap();cancelHold();for(const p of points.values())p.mode='external';
+      pointer=e.pointerId;button.setPointerCapture(pointer);button.classList.add('down');set(button,name,true);e.preventDefault();
+    });
+    for(const event of ['pointerup','pointercancel','pointerleave','lostpointercapture'])on(button,event,up);
+    on(button,'contextmenu',e=>e.preventDefault());
+    on(button,'click',e=>{if(e.detail===0){cancelTap();if(!anyHeld())click(name);}}); // keyboard/AT activation
+    on(window,'pd:control-lost',()=>pointer=null);on(window,'blur',()=>pointer=null);
+    on(document,'visibilitychange',()=>{if(document.hidden)pointer=null;});
+    signal.addEventListener('abort',()=>pointer=null,{once:true});
+  };
+  return {reset,bindButton};
 }

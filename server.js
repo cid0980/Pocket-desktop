@@ -696,16 +696,28 @@ function handleControlSocket(req, socket, head) {
     applyControlMessage(msg, pad);
   });
 
-  client.on('close', (code) => {
-    log.info('ctl: closed', { peer, code });
-    // Release anything the phone was holding when it went away, so a dropped
-    // connection never leaves the character sprinting into a wall.
+  // A dead Wi-Fi link can leave TCP open for minutes. A short input lease
+  // releases real buttons even when no close frame reaches the PC.
+  let lastControlActivity = Date.now();
+  client.on('message', () => { lastControlActivity = Date.now(); });
+  const releaseInputs = () => {
     pad.sendBatch([
       'a lx 0', 'a ly 0', 'a rx 0', 'a ry 0', 'a lt 0', 'a rt 0', 'a dx 0', 'a dy 0',
       'p a 0', 'p b 0', 'p x 0', 'p y 0', 'p lb 0', 'p rb 0', 'p lt 0', 'p rt 0',
       'p ls 0', 'p rs 0', 'p back 0', 'p start 0', 'p guide 0',
     ]);
     for (const b of ['left', 'right', 'middle']) pad.mouseButton(b, false);
+  };
+  const lease = setInterval(() => {
+    if (Date.now() - lastControlActivity > 3500) {
+      releaseInputs(); clearInterval(lease);
+      client.close(1001, 'input heartbeat expired');
+    }
+  }, 500);
+  lease.unref();
+  client.on('close', (code) => {
+    clearInterval(lease); releaseInputs();
+    log.info('ctl: closed', { peer, code });
   });
   client.on('error', (err) => log.warn('ctl: socket error', { peer, message: err.message }));
 }

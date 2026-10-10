@@ -750,3 +750,14 @@ button:focus-visible,[tabindex]:focus-visible { outline:2px solid #78dcca; outli
 /* A filtered ancestor would make customized fixed-position click buttons
    relative to the dock instead of the viewport. Keep this surface opaque. */
 #remote-dock .pillbar { backdrop-filter:none; -webkit-backdrop-filter:none; background:#101823f5; }
+/* Keep the editor entry above customized controls and readable on LAN phones. */
+.pad-top { position:relative; z-index:30; }
+.pad-top [data-edit] { border-color:#69d7bb; color:#b9ffec; flex-shrink:0; }
+.pad-top .pad-chip { padding-inline:8px; }
+.pad-screen.layout-editing { box-shadow:inset 0 0 0 3px #69d7bb; }
+.layout-editor { max-height:70dvh; overflow:auto; touch-action:pan-y; }
+.layout-editing [data-layout] { touch-action:none; }
+#mouse-surface.dragging { border:2px solid #69d7bb; background:#183d3c; }
+#mouse-surface.dragging strong::after { content:' · holding'; color:#9ff5db; }
+@media(max-width:380px) { .pad-top {gap:3px;} .pad-top .pad-chip {padding-inline:5px;font-size:10px;} }
+.pad-panel { z-index:40; }

@@ -1,3 +1,53 @@
+# Mouse gestures and layout repair — v1.3.2
+
+Verified 2026-10-10 in Debian/Linux, Chromium, Xvfb and a separate Xorg dummy display
+using the actual virtual mouse through the evdev driver.
+
+## Current targeted results
+
+- **32/32 gestures tests**: actual Linux input events for single/double/triple taps,
+  pointer-only swipes, true held-button drags, cancellation, leaving the pad,
+  dedicated left/right hold-and-move, switching input sources, desktop mouse drag,
+  socket closure and silent-link heartbeat expiry. Layout editing/save/reload/cancel/
+  reset runs on an insecure HTTP hostname with `structuredClone` deliberately disabled.
+  Saved pad positions fit portrait/landscape bounds; A works after leaving editing.
+- **6/6 real text-selection checks**: surface hold and dedicated-button hold both
+  selected `Select this te` in headed Chromium on the controlled Xorg desktop.
+  Trusted native mouse events showed down → held movement → up. The selection stayed
+  highlighted after release and a subsequent pointer-only movement. See
+  `test/SELECTION.md` for the rig; this is not a mocked DOM selection.
+- Regression: **56/56** pad/kernel input, **41/41** browser controls including JSON
+  import/export/fullscreen, **25/25** existing remote UI, **45/45** API,
+  **13/13** restart, **12/12** uinput tests.
+
+## Diagnosis and limits
+
+The backend already implemented mouse down/up and relative movement. The frontend
+was pointer-only and had no surface tap or hold recognizer. The repair adds one
+shared gesture/button state machine rather than another competing event system.
+
+The layout editor existed and persisted data, but was not exposed in the gamepad's
+settings panel. It now has a settings entry as well as an explicit header entry.
+The editor also assumed `structuredClone` existed, which would abort initialization
+on browsers lacking it. JSON-only cloning removes that unnecessary dependency.
+Current test Chromium DOES provide structuredClone on insecure HTTP; therefore
+HTTP alone is NOT established as the cause of the user's missing settings. The
+fallback was separately verified with that API disabled. The exact old-phone or
+stale-build failure has not been reproduced on the user's device.
+
+A single tap intentionally waits 280 ms before left-click, so a double tap can
+instead send only right-click. Hold still for 350 ms before a one-finger touch drag;
+early swipes only move. Desktop pressed movement starts dragging at the movement
+threshold. Input expiry after a silent network failure is approximately four
+seconds, not instantaneous.
+
+No physical phone/tablet was available. Touch events were Chromium-emulated; real
+Android/iOS gestures and ergonomic timing remain to be confirmed on-device. No
+claim of physical-device acceptance is made. The older motion/game compatibility
+limitations below still apply. The GitHub Actions template has not run as CI.
+
+---
+
 # Portable Linux update — v1.3.1
 
 Tested 2026-10-09. This update adds setup scripts and Git publishing support; it
