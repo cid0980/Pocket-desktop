@@ -1,3 +1,28 @@
+# Screenshot viewer — v1.4.1
+
+Verified 2026-10-10. This focused change leaves the screenshot capture API and
+remote/gamepad/mouse input protocols unchanged. The old “Open full size” link
+had a `download` attribute; it is now an Actual size action inside the viewer.
+
+- Screenshot viewer: **23 checks passed**, using a real API capture plus Chromium
+  touch emulation for pinch, reverse pinch, dragging and double-tap.
+- Existing remote UI regression: **25 checks passed**.
+- Both suites also passed against a fresh ZIP extraction on port 8766.
+- Geometry: whole image fits, controls remain reachable at 320×568, 390×844,
+  844×390 and 568×320. Zoom buttons, Fit, native-pixel Actual size, wheel zoom,
+  refresh, visible capture errors and recovery were checked. No download fired.
+- Closing releases the image/object URL and cancels pending capture requests.
+  Modal focus is contained; Escape closes it. The screenshot PWA shortcut now
+  starts a capture instead of opening an empty sheet.
+- These are browser-emulated touch checks, not physical Android/iPhone tests.
+  A screenshot is still a captured frame; live control remains Remote screen.
+
+Run `node --experimental-websocket test/screenshot-test.js` with a test server
+on 8765 (or set `PORT`), PIN 1234, and an available X11 screenshot provider.
+Do not run desktop input regression tests against your active personal desktop.
+
+---
+
 # Mobile UI and standalone keyboard — v1.4.0
 
 Verified 2026-10-10 against a controlled Linux/X11 desktop and Chromium phone

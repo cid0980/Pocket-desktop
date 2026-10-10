@@ -1,6 +1,13 @@
 # Pocket Desktop
 
-**v1.4.0 — touch-friendly workspaces, categorized settings and standalone keyboard.**
+**v1.4.1 — in-app screenshot zoom and pan.**
+
+Open **Screenshot** to view the whole capture without downloading it. Pinch in/out,
+drag to pan when enlarged, or use **+ / −**, **Fit** and **Actual size**. Double-tap
+toggles zoom. Mouse wheel and keyboard +/−/0/arrow controls also work. **Refresh**
+takes a new capture; this remains a still image, not the live remote screen.
+
+### Features from v1.4.0
 
 - **Keyboard** is a home tile and a mousepad shortcut. Focus a field on the PC,
   write a draft using your phone's native keyboard, then choose **Send text** or
@@ -140,7 +147,7 @@ When zoomed in, two fingers pan the view. **Scroll mode** turns one-finger dragg
 
 * **Keyboard** — shows the key chip row; the soft keyboard is bridged to the PC, including letters, symbols, arrow keys, `Enter`, `Tab`, `Esc`, `F5`, `PrtSc`, `Ctrl+Alt+Del`.
 * **Clipboard…** — type/paste text and push it to the PC clipboard, and read what the PC has on *its* clipboard.
-* **Take screenshot** — grabs the PC screen and shows it here (downloadable).
+* **Take screenshot** — grabs the PC screen and opens the in-app zoom/pan viewer—no download required.
 * **Zoom** — cycle Fit → 1:1 → 2×.
 * **Quality** — cycle Sharp → Balanced → Fast (use *Fast* on weak Wi-Fi).
 * **View only** — turn the screen into a live monitor with input disabled.

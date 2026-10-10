@@ -2,6 +2,7 @@
 
 import { RemoteSession } from './remote.js';
 import './pad.js';
+import {screenshotViewer} from './screenshot-viewer.js';
 import {settingsNavigation, keyboardWorkspace} from './workspaces.js';
 import { LayoutEditor, fullscreen, MotionPointer, bindMouseButton, bindTouchpad, bindScrollStrip } from './controls.js';
 
@@ -11,7 +12,7 @@ const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
 
 /** Keep in sync with VERSION in lib/config.js — a test asserts they match. */
-const CLIENT_VERSION = '1.4.0';
+const CLIENT_VERSION = '1.4.1';
 
 /**
  * Session token store. Normally the session lives in an HttpOnly cookie, but
@@ -481,7 +482,7 @@ new ResizeObserver(()=>{
   const run = async () => {
     if (go === 'pad') await openPad();
     else if (go === 'remote') await openRemote();
-    else if (go === 'shot') openSheet('sheet-shot');
+    else if (go === 'shot') {openSheet('sheet-shot');loadScreenshot();}
   };
   // wait until we are signed in and sitting on the home screen
   const deadline = Date.now() + 60000;
@@ -1167,16 +1168,22 @@ pttBtn.addEventListener('pointerleave', (ev) => { if (pttActive) pttEnd(ev); });
 
 /* ── sheets ────────────────────────────────────────────────────── */
 
+let screenshotReturnFocus=null;
 function openSheet(id) {
+  const previous=document.activeElement;
   closeSheets();
+  if(id==='sheet-shot')screenshotReturnFocus=previous;
   $('#backdrop').hidden = false;
   $(`#${id}`).hidden = false;
 }
 
 function closeSheets() {
+  const wasScreenshot=!$('#sheet-shot').hidden;
+  if(wasScreenshot)cancelScreenshot();
   if(!$('#sheet-settings').hidden && settingsFocus?.getClientRects().length)settingsFocus.focus({preventScroll:true});
   $('#backdrop').hidden = true;
   $$('.sheet').forEach((s) => { s.hidden = true; });
+  if(wasScreenshot&&screenshotReturnFocus?.getClientRects().length)screenshotReturnFocus.focus({preventScroll:true});
 }
 
 $('#backdrop').addEventListener('click', closeSheets);
@@ -1309,36 +1316,31 @@ $('#btn-clip-copy').addEventListener('click', async () => {
 
 /* screenshot sheet */
 
+const shotViewer=screenshotViewer($('#sheet-shot'));
+let shotURL=null,shotController=null,shotRequest=0;
+function cancelScreenshot(){
+  shotRequest++;shotController?.abort();shotController=null;shotViewer.clear();
+  if(shotURL)URL.revokeObjectURL(shotURL);shotURL=null;
+  $('#btn-shot-again').disabled=false;
+}
 async function loadScreenshot() {
-  const img = $('#shot-img');
-  const msg = $('#shot-msg');
-  const open = $('#shot-open');
-  img.hidden = true;
-  open.hidden = true;
-  msg.hidden = false;
-  msg.textContent = 'Capturing…';
-  try {
-    const token = sessionToken.get();
-    const res = await fetch('/api/screenshot', {
-      credentials: 'same-origin',
-      cache: 'no-store',
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || 'Screenshot failed');
-    }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    img.src = url;
-    img.hidden = false;
-    open.href = url;
-    open.download = `screenshot-${Date.now()}.png`;
-    open.hidden = false;
-    msg.hidden = true;
-  } catch (err) {
-    msg.textContent = err.message;
-  }
+  cancelScreenshot();const request=shotRequest;
+  shotController=new AbortController();
+  const img=$('#shot-img'),msg=$('#shot-msg');
+  msg.hidden=false;msg.textContent='Capturing…';$('#btn-shot-again').disabled=true;
+  try{
+    const token=sessionToken.get();
+    const res=await fetch('/api/screenshot',{credentials:'same-origin',cache:'no-store',signal:shotController.signal,headers:token?{Authorization:`Bearer ${token}`}:{}});
+    if(!res.ok){const data=await res.json().catch(()=>({}));throw Error(data.error||'Screenshot failed');}
+    const blob=await res.blob();if(request!==shotRequest)return;
+    shotURL=URL.createObjectURL(blob);img.src=shotURL;await img.decode();
+    if(request!==shotRequest)return;
+    img.hidden=false;msg.hidden=true;shotViewer.loaded();
+  }catch(err){
+    if(request!==shotRequest)return;
+    shotViewer.clear();if(shotURL)URL.revokeObjectURL(shotURL);shotURL=null;
+    msg.hidden=false;msg.textContent=err.message||'Screenshot failed';
+  }finally{if(request===shotRequest)$('#btn-shot-again').disabled=false;}
 }
 
 $('#btn-shot-again').addEventListener('click', loadScreenshot);

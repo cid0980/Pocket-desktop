@@ -308,7 +308,7 @@
 
       <div class="pad-panel" id="pad-panel">
         <button class="btn" data-edit="pad">Customize gamepad layout</button>
-        <p class="muted small">v1.4.0 · Move outlined controls, then Save. Cancel keeps your previous layout.</p>
+        <p class="muted small">v1.4.1 · Move outlined controls, then Save. Cancel keeps your previous layout.</p>
         <label class="row between">
           <span>Aim sensitivity</span>
           <input type="range" id="pad-sens" min="0.3" max="2.5" step="0.1" value="1">
@@ -329,7 +329,7 @@
   <footer class="mouse-options"><button class="btn ghost" id="mouse-keyboard">⌨ Keyboard</button>
     <label class="mouse-pref" for="mouse-speed"><span>Pointer Speed <output id="mouse-speed-value">0.60×</output></span><span class="speed-range">Slow <input id="mouse-speed" type="range" min="0.2" max="2" step="0.05" value="0.6"> Fast</span></label>
     <label class="mouse-pref" for="mouse-tap-interval"><span>Double-tap window <output id="mouse-tap-value">300 ms</output></span><input id="mouse-tap-interval" type="range" min="250" max="350" step="10" value="300"></label>
-    <p id="mouse-preference-status" role="status">Settings apply immediately · v1.4.0</p>
+    <p id="mouse-preference-status" role="status">Settings apply immediately · v1.4.1</p>
     <p id="mouse-input-status" role="status">Connecting to PC…</p>
     <details class="mouse-motion-settings"><summary>Optional motion controls</summary><button class="pad-chip" id="mouse-motion">Enable motion</button><button class="pad-chip" id="mouse-center">Re-centre</button><label>Motion sensitivity <input id="mouse-sens" type="range" min="0.3" max="3" step="0.1" value="1"></label><p id="mouse-status" role="status">Motion is optional; it does not change touchpad speed.</p></details>
   </footer>
@@ -375,7 +375,7 @@
     <section class="settings-category" data-category-panel="motion" hidden><p class="category-intro">Motion needs trusted HTTPS, a compatible phone and sensor permission.</p><button class="btn" id="settings-connect-motion">Connect mouse controls</button><div id="motion-settings-content"></div></section>
     <section class="settings-category" data-category-panel="device" hidden><label class="field"><span>PC name</span><input id="set-name" type="text" maxlength="40"></label><p class="muted small" id="settings-device">—</p><button class="btn ghost" id="btn-pair-here">Pair another device</button><button class="btn" id="btn-install" hidden>Install on this phone</button><p class="muted small" id="install-hint" hidden></p></section>
     <section class="settings-category" data-category-panel="connection" hidden><p class="category-intro">Keep access private. Use this app only on networks you trust.</p><label class="field"><span>VNC password (optional, 4–8 characters)</span><input id="set-vncpass" type="password" maxlength="8" placeholder="none" autocomplete="off"></label><p class="muted small">This is the screen-server password, not your app PIN.</p><button class="btn danger" id="btn-logout">Sign out of this phone</button></section>
-    <section class="settings-category" data-category-panel="help" hidden><p class="category-intro">Check the connection or look up a gesture.</p><button class="btn" id="btn-show-diag">Run diagnostics</button><button class="btn ghost" id="settings-gestures">Remote-screen gesture guide</button><p class="muted small">v1.4.0 · Input stays on your local network. Keyboard drafts are not saved to browser storage.</p></section>
+    <section class="settings-category" data-category-panel="help" hidden><p class="category-intro">Check the connection or look up a gesture.</p><button class="btn" id="btn-show-diag">Run diagnostics</button><button class="btn ghost" id="settings-gestures">Remote-screen gesture guide</button><p class="muted small">v1.4.1 · Input stays on your local network. Keyboard drafts are not saved to browser storage.</p></section>
   </div>
   <footer class="settings-save" id="settings-save-bar" hidden><span>PC settings need saving.</span><button class="btn" id="btn-save-settings">Save changes</button></footer>
 </aside>
@@ -439,14 +439,23 @@
   </div>
 </aside>
 
-<aside class="sheet" id="sheet-shot" hidden>
-  <header class="sheet-head"><h2>Screenshot</h2><button class="icon-btn" data-close-sheet aria-label="Close">✕</button></header>
-  <div class="sheet-body center">
-    <img id="shot-img" alt="Screenshot of the PC" hidden>
-    <p class="muted small" id="shot-msg">Loading…</p>
-    <a class="btn" id="shot-open" target="_blank" rel="noopener" hidden>Open full size</a>
-    <button class="btn ghost" id="btn-shot-again">Refresh</button>
+<aside class="sheet screenshot-sheet" id="sheet-shot" role="dialog" aria-modal="true" aria-labelledby="shot-title" hidden>
+  <header class="sheet-head"><h2 id="shot-title">Screenshot</h2><button class="icon-btn" data-close-sheet aria-label="Close screenshot">✕</button></header>
+  <div id="shot-stage" tabindex="0" role="region" aria-label="Screenshot viewer. Pinch to zoom and drag to pan. Use plus, minus, zero or arrow keys." aria-describedby="shot-help">
+    <img id="shot-img" alt="Screenshot of the PC" draggable="false" hidden>
+    <p class="muted" id="shot-msg" role="status">Capturing…</p>
   </div>
+  <footer class="shot-toolbar">
+    <div class="shot-tools" role="group" aria-label="Screenshot zoom controls">
+      <button class="btn ghost" data-shot-view="out" aria-label="Zoom out">−</button>
+      <output id="shot-zoom" aria-live="polite">—</output>
+      <button class="btn ghost" data-shot-view="in" aria-label="Zoom in">+</button>
+      <button class="btn ghost" data-shot-view="fit">Fit</button>
+      <button class="btn ghost" id="shot-open" data-shot-view="actual">Actual size</button>
+      <button class="btn ghost" id="btn-shot-again">Refresh</button>
+    </div>
+    <p id="shot-help">Pinch or double-tap to zoom · Drag to pan · No download needed</p>
+  </footer>
 </aside>
 
 <aside class="sheet" id="sheet-diag" hidden>

@@ -3,9 +3,9 @@
  * cache-first for vendored libraries and icons (they are versioned by path).
  * API responses are never cached. */
 
-const CACHE = 'pocket-desktop-v10'; // bump with every release so phones stop running stale files
+const CACHE = 'pocket-desktop-v11'; // bump with every release so phones stop running stale files
 const SHELL = ['/', '/index.html', '/assets/style.css', '/assets/app.js', '/assets/remote.js',
-  '/assets/pad.js', '/assets/controls.js', '/assets/workspaces.js',
+  '/assets/pad.js', '/assets/controls.js', '/assets/workspaces.js', '/assets/screenshot-viewer.js',
   '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon-180.png',
   '/manifest.webmanifest'];
 
