@@ -741,9 +741,6 @@ code {
 .mouse-clicks { display:flex; gap:12px; }.mouse-clicks button { flex:1; width:45%; }
 .mouse-options { display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; }
 .mouse-options label { font-size:12px; }.mouse-options input { width:100px; } #mouse-status { width:100%; margin:0; font-size:12px; color:#afc4df; text-align:center; }
-.layout-editing [data-layout] { outline:2px dashed #69d7bb !important; cursor:grab; touch-action:none; }
-.layout-editor { position:fixed; z-index:1000; top:58px; left:50%; transform:translateX(-50%); width:min(94vw,540px); padding:12px; border:1px solid #69d7bb; border-radius:16px; background:#101c2bf5; box-shadow:0 8px 40px #0008; }
-.layout-editor div { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0; }.layout-editor button { padding:10px; min-height:44px; background:#2a405a; border:0; border-radius:8px; color:white; }.layout-editor p { font-size:12px; margin:4px 0; }
 #remote-dock .pillbar { flex-wrap:wrap; max-width:94vw; } #remote-dock .pill-btn { min-width:44px; min-height:44px; font-size:12px; }
 #screen-remote #remote-stage { top:64px; bottom:120px; }
 button:focus-visible,[tabindex]:focus-visible { outline:2px solid #78dcca; outline-offset:3px; }
@@ -755,7 +752,6 @@ button:focus-visible,[tabindex]:focus-visible { outline:2px solid #78dcca; outli
 .pad-top [data-edit] { border-color:#69d7bb; color:#b9ffec; flex-shrink:0; }
 .pad-top .pad-chip { padding-inline:8px; }
 .pad-screen.layout-editing { box-shadow:inset 0 0 0 3px #69d7bb; }
-.layout-editor { max-height:70dvh; overflow:auto; touch-action:pan-y; }
 .layout-editing [data-layout] { touch-action:none; }
 #mouse-surface.dragging { border:2px solid #69d7bb; background:#183d3c; }
 #mouse-surface.dragging strong::after { content:' · holding'; color:#9ff5db; }
@@ -937,3 +933,26 @@ button:disabled { opacity:.48;cursor:not-allowed; }
 #shot-help { text-align:center;font-size:11px;color:var(--muted);line-height:1.5;margin:8px 0 0; }
 @media (max-width:380px) { .shot-tools {gap:5px;} .shot-tools button {padding:8px;font-size:12px;} #shot-zoom {min-width:40px;} }
 @media (orientation:landscape) and (max-height:450px) { .screenshot-sheet .sheet-head {min-height:48px;padding:2px 12px;} .shot-toolbar {padding-top:6px;padding-bottom:4px;} #shot-help {margin:4px 0 0;} }
+
+/* ── layout editor v2 ───────────────────────────────────────────── */
+.layout-editing [data-layout] { outline:2px dashed #69d7bb !important; cursor:grab; touch-action:none; }
+.layout-editing [data-layout].layout-selected { outline:3px solid #ffd166 !important; }
+.layout-editing [data-layout].layout-hidden { opacity:.35; outline:2px dashed #ff9f6b !important; }
+.layout-editor { position:fixed; z-index:1000; left:8px; right:8px; bottom:calc(8px + var(--safe-b)); margin:0 auto; max-width:560px; max-height:42dvh; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; padding:10px; border:1px solid #69d7bb; border-radius:16px; background:#101c2bf5; box-shadow:0 8px 40px #0008; }
+.layout-editor[hidden] { display:none !important; }
+.layout-editor .le-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.layout-editor .le-body { display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+.layout-editor.collapsed .le-body { display:none; }
+.layout-editor .le-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.layout-editor .le-head [data-sel] { flex:1 1 90px; min-width:0; font-size:13px; color:#cfe8e1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.layout-editor.dragging .le-body { display:none; }
+.layout-editor .le-hint { font-size:12px; color:#9fb3c8; }
+.layout-editor .le-row[data-hidden-list] span { font-size:12px; color:#9fb3c8; }
+.layout-editor .le-main { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+.layout-editor button { min-height:44px; min-width:44px; padding:8px 12px; background:#2a405a; border:0; border-radius:8px; color:#fff; font:inherit; font-size:14px; cursor:pointer; }
+.layout-editor button:disabled { opacity:.4; cursor:default; }
+.layout-editor button.primary { background:#69d7bb; color:#06121f; font-weight:600; }
+.layout-editor [data-hidden-list] button { background:#3a2f1e; }
+.layout-editor p { font-size:12px; margin:0; color:#9fb3c8; }
+.layout-handle { position:fixed; z-index:1001; width:44px; height:44px; touch-action:none; cursor:nwse-resize; }
+.layout-handle::after { content:''; position:absolute; right:6px; bottom:6px; width:20px; height:20px; border-radius:5px; background:#69d7bb; border:2px solid #06121f; box-sizing:border-box; }
