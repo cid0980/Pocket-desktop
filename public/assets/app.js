@@ -395,6 +395,16 @@ function beginLayout(page){
   layouts.begin(page);
 }
 $$('[data-edit]').forEach(el=>el.addEventListener('click',()=> beginLayout(el.dataset.edit)));
+/** Fullscreen menu: switch between Gamepad, Mouse pad and Keyboard without leaving fullscreen. */
+document.addEventListener('pd:open',e=>{
+  const target=e.detail;
+  if(currentWorkspace()===target) return;
+  releaseWorkspaceInputs();
+  mouseAbort?.abort();mouseMotion?.stop();mouseMotion=null;
+  if(target==='pad') openPad();
+  else if(target==='mouse') openMouse('home');
+  else if(target==='keyboard') openKeyboard('home');
+});
 document.addEventListener('pd:customize',()=>{
   const screen=SCREENS.find(s=>!$('#screen-'+s)?.hidden);
   const page={remote:'remote',pad:'pad',mouse:'mouse'}[screen];

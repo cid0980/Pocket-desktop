@@ -9,6 +9,9 @@ function immersiveMenu() {
     wrap.id = 'pd-immersive-menu-wrap'; wrap.hidden = true;
     wrap.innerHTML = `<button type="button" id="pd-immersive-menu" aria-expanded="false" aria-label="Fullscreen menu">Menu</button>
       <div id="pd-immersive-panel" hidden>
+        <button type="button" data-imm="pad">Gamepad</button>
+        <button type="button" data-imm="mouse">Mouse pad</button>
+        <button type="button" data-imm="keyboard">Keyboard</button>
         <button type="button" data-imm="layout">Customize layout</button>
         <button type="button" data-imm="exit">Exit fullscreen</button>
       </div>`;
@@ -23,6 +26,7 @@ function immersiveMenu() {
       panel.hidden = true; menu.setAttribute('aria-expanded', 'false');
       if (op === 'exit') toggleImmersive();
       if (op === 'layout') document.dispatchEvent(new CustomEvent('pd:customize'));
+      if (op === 'pad' || op === 'mouse' || op === 'keyboard') document.dispatchEvent(new CustomEvent('pd:open', { detail: op }));
     });
   }
   return wrap;
