@@ -18,8 +18,43 @@ function immersiveMenu() {
     document.body.append(wrap);
     const menu = wrap.querySelector('#pd-immersive-menu');
     const panel = wrap.querySelector('#pd-immersive-panel');
+    // Drag the Menu anywhere (it is remembered on this browser). A tap still opens the menu.
+    let grab = null, moved = false;
+    menu.addEventListener('pointerdown', e => {
+      if (e.button !== 0) return;
+      const r = wrap.getBoundingClientRect();
+      grab = { id: e.pointerId, dx: e.clientX - r.left, dy: e.clientY - r.top, x0: e.clientX, y0: e.clientY };
+      moved = false; menu.setPointerCapture(e.pointerId);
+    });
+    menu.addEventListener('pointermove', e => {
+      if (!grab || e.pointerId !== grab.id) return;
+      if (!moved && Math.hypot(e.clientX - grab.x0, e.clientY - grab.y0) < 8) return;
+      moved = true; panel.hidden = true; menu.setAttribute('aria-expanded', 'false');
+      placeMenu(e.clientX - grab.dx, e.clientY - grab.dy);
+    });
+    const endMenuGrab = e => {
+      if (!grab || e.pointerId !== grab.id) return;
+      grab = null;
+      if (moved) { const r = wrap.getBoundingClientRect(); placeMenu(r.left, r.top, true); }
+    };
+    menu.addEventListener('pointerup', endMenuGrab); menu.addEventListener('pointercancel', endMenuGrab);
     menu.addEventListener('click', () => {
+      if (moved) { moved = false; return; }
       panel.hidden = !panel.hidden; menu.setAttribute('aria-expanded', String(!panel.hidden));
+      placeMenu(wrap.getBoundingClientRect().left, wrap.getBoundingClientRect().top);
+    });
+    function placeMenu(x, y, save) {
+      const x2 = Math.max(0, Math.min(x, innerWidth - wrap.offsetWidth));
+      const y2 = Math.max(0, Math.min(y, innerHeight - wrap.offsetHeight));
+      Object.assign(wrap.style, { left: x2 + 'px', top: y2 + 'px', right: 'auto' });
+      if (save) { try { localStorage.setItem('pd-immersive-menu-pos', JSON.stringify({ x: x2, y: y2 })); } catch {} }
+    }
+    try {
+      const saved = JSON.parse(localStorage.getItem('pd-immersive-menu-pos') || 'null');
+      if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) placeMenu(saved.x, saved.y);
+    } catch {}
+    window.addEventListener('resize', () => {
+      if (!wrap.hidden && wrap.style.left) placeMenu(parseFloat(wrap.style.left), parseFloat(wrap.style.top));
     });
     panel.addEventListener('click', e => {
       const op = e.target.closest('[data-imm]')?.dataset.imm;
@@ -484,10 +519,10 @@ export class LayoutEditor {
         const pos = this.draft.pages[page][id]; const n = this.natural[page][id];
         if (!pos || !n) continue;
         const { w, h } = this.size(page, id), top = this.topInset(page, id);
+        // Size by real width and height (no transform), so the box you see is the box that receives touches.
         Object.assign(el.style, {
           position: 'fixed', right: 'auto', bottom: 'auto', margin: '0', zIndex: '12',
-          width: n.w + 'px', height: n.h + 'px', transformOrigin: '0 0',
-          transform: `scale(${pos.sx}, ${pos.sy})`,
+          width: w + 'px', height: h + 'px',
           left: (8 + pos.x * Math.max(0, innerWidth - w - 16)) + 'px',
           top: (top + pos.y * Math.max(0, innerHeight - h - top - 8)) + 'px',
         });

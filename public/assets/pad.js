@@ -59,6 +59,8 @@ class Stick {
     this.active = true;
     this.pointerId = e.pointerId;
     const rect = this.zone.getBoundingClientRect();
+    // The stick's reach follows the zone's size, so a small or large custom zone still gives full range.
+    this.radius = Math.max(28, Math.min(rect.width, rect.height) * 0.4);
     this.originX = e.clientX;
     this.originY = e.clientY;
     this.knob.style.left = `${e.clientX - rect.left}px`;

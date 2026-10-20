@@ -971,7 +971,7 @@ body.pd-immersive #remote-stage { top:0 !important; bottom:0 !important; }
 .layout-editor .le-num input:disabled { opacity:.4; }
 
 /* floating fullscreen menu (replaces the top-bar controls while fullscreen) */
-#pd-immersive-menu-wrap { position:fixed; z-index:2000; top:calc(var(--safe-t) + 6px); right:calc(var(--safe-r) + 6px); display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+#pd-immersive-menu-wrap { position:fixed; z-index:2000; left:calc(var(--safe-l) + 6px); top:40%; touch-action:none; display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
 #pd-immersive-menu-wrap[hidden] { display:none !important; }
 #pd-immersive-menu { min-height:40px; min-width:64px; padding:8px 14px; border-radius:999px; border:1px solid #69d7bb; background:#101c2bf0; color:#e6f7f2; font:600 14px/1 -apple-system,BlinkMacSystemFont,sans-serif; }
 #pd-immersive-panel { display:flex; flex-direction:column; gap:6px; padding:8px; border-radius:14px; border:1px solid #69d7bb; background:#101c2bf5; }
