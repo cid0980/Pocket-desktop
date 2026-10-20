@@ -305,7 +305,35 @@ export class LayoutEditor {
     this.pages[page].classList.add('layout-editing');
     this.pages[page].querySelectorAll('[data-edit]').forEach(b => b.setAttribute('aria-pressed', 'true'));
     this.message('Changes are not saved yet.');
+    this.fillMissing(page);
     this.apply();
+  }
+
+  /**
+   * Once a page has any moved control, every other control gets a saved position too, measured where it sits now.
+   * Otherwise untouched controls stay in the normal page flow and shift when the top bar is hidden in fullscreen,
+   * which can put them on top of moved controls and block touches.
+   */
+  fillMissing(page) {
+    const entries = this.draft.pages[page];
+    if (!Object.keys(entries).length) return;
+    for (const el of Object.values(this.nodes[page])) {
+      for (const prop of ['position', 'left', 'top', 'right', 'bottom', 'transform', 'transform-origin', 'z-index', 'margin', 'width', 'height', 'display', 'border-radius'])
+        el.style.removeProperty(prop);
+    }
+    const found = [];
+    for (const [id, el] of Object.entries(this.nodes[page])) {
+      if (entries[id] || this.headerNodes.has(el)) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) continue;
+      found.push([id, r]);
+    }
+    for (const [id, r] of found) {
+      const w = r.width, h = r.height, top = this.topInset(page, id);
+      const x = (r.left - 8) / Math.max(1, innerWidth - w - 16);
+      const y = (r.top - top) / Math.max(1, innerHeight - h - top - 8);
+      entries[id] = { x: Math.min(1, Math.max(0, x)), y: Math.min(1, Math.max(0, y)), sx: 1, sy: 1 };
+    }
   }
 
   message(text, important = false) {
@@ -361,7 +389,11 @@ export class LayoutEditor {
 
   topInset(page, id) {
     if (id && this.headerNodes.has(this.nodes[page][id])) return 8;
-    return page === 'pad' ? Math.max(8, this.pages.pad.querySelector('.pad-top').getBoundingClientRect().bottom + 8) : 8;
+    if (page !== 'pad') return 8;
+    // Remember the top bar's bottom edge while it is visible, so fullscreen (bar hidden) keeps the same positions.
+    const r = this.pages.pad.querySelector('.pad-top').getBoundingClientRect();
+    if (r.height > 0) this.padBarBottom = r.bottom;
+    return Math.max(8, (this.padBarBottom ?? 56) + 8);
   }
 
   /** On-screen size of a control: natural size times its width/height multipliers. */
