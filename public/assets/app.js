@@ -445,6 +445,18 @@ $('#mouse-enter').addEventListener('click',async()=>{
   catch(e){$('#mouse-input-status').textContent=e.message;}
   finally{button.disabled=false;}
 });
+/* Appearance: user-chosen UI size, remembered on this device. */
+function applyUiScale(v){
+  const n=Math.min(1.4,Math.max(0.8,Number(v)||1));
+  document.documentElement.style.setProperty('--ui-scale',String(n));
+  const out=$('#ui-scale-value'); if(out) out.textContent=Math.round(n*100)+'%';
+  const range=$('#ui-scale'); if(range && Number(range.value)!==n) range.value=String(n);
+  try{localStorage.setItem('pd-ui-scale',String(n));}catch{}
+  window.dispatchEvent(new Event('resize'));
+}
+applyUiScale(localStorage.getItem('pd-ui-scale')||1);
+$('#ui-scale')?.addEventListener('input',e=>applyUiScale(e.target.value));
+$('#ui-scale-reset')?.addEventListener('click',()=>applyUiScale(1));
 const settingsNav=settingsNavigation({onClose:closeSheets,onAction:async action=>{
   const from=currentWorkspace();closeSheets();
   if(action==='keyboard'){openKeyboard(from);return;}
