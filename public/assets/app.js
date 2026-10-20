@@ -4,7 +4,7 @@ import { RemoteSession } from './remote.js';
 import './pad.js';
 import {screenshotViewer} from './screenshot-viewer.js';
 import {settingsNavigation, keyboardWorkspace} from './workspaces.js';
-import { LayoutEditor, fullscreen, MotionPointer, bindMouseButton, bindTouchpad, bindScrollStrip } from './controls.js';
+import { LayoutEditor, fullscreen, toggleImmersive, MotionPointer, bindMouseButton, bindTouchpad, bindScrollStrip } from './controls.js';
 
 /* ── tiny helpers ──────────────────────────────────────────────── */
 
@@ -366,10 +366,14 @@ for (const side of ['left','right']) $('#remote-'+side).addEventListener('click'
 });
 // Stable per-page IDs, independent of order or translated labels.
 const pageRoots={remote:$('#screen-remote'),pad:$('#screen-pad'),mouse:$('#screen-mouse')};
-const layoutSelectors={remote:['#remote-bar','#remote-dock','#remote-left','#remote-right'],pad:['#pad-move','#pad-look','#pad-dpad','.pad-face [data-pad-btn]','.pad-system [data-pad-btn]','#pad-click-left','#pad-click-right','#pad-motion-toggle','#pad-center','#pad-to-mouse','#pad-lt','#pad-rt','[data-pad-btn="lb"]','[data-pad-btn="rb"]']};
+const layoutSelectors={remote:['#remote-left','#remote-right','#remote-bar button','#remote-dock .pill-btn'],pad:['#pad-move','#pad-look','#pad-dpad','.pad-face [data-pad-btn]','.pad-system [data-pad-btn]','#pad-click-left','#pad-click-right','#pad-motion-toggle','#pad-center','.pad-top button','#pad-lt','#pad-rt','[data-pad-btn="lb"]','[data-pad-btn="rb"]'],mouse:['.control-top button']};
+const layoutClaimed=new Set();
 for(const [page,selectors] of Object.entries(layoutSelectors)) for(const selector of selectors) {
-  // Each button is its own layout item (A/B/X/Y, L3/R3/Guide/Select/Start all move separately).
-  for(const el of pageRoots[page].querySelectorAll(selector)) el.dataset.layout=el.id || el.dataset.padBtn || selector.replace(/[^a-z-]/g,'');
+  // Each button is its own layout item. Keys are stable: element id, data-pad-btn, or selector + index.
+  pageRoots[page].querySelectorAll(selector).forEach((el,i)=>{
+    if(layoutClaimed.has(el)) return; layoutClaimed.add(el);
+    el.dataset.layout=el.id || el.dataset.padBtn || `${selector.replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'')}-${i}`;
+  });
 }
 const layouts = new LayoutEditor(pageRoots,toast); window.pocketLayouts=layouts;
 $$('[data-edit]').forEach(el=>el.addEventListener('click',()=> {
@@ -1078,12 +1082,7 @@ $('#remote-menu').addEventListener('click', async (ev) => {
 });
 
 async function toggleFullscreen() {
-  try {
-    if (!document.fullscreenElement) await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
-    else await document.exitFullscreen();
-  } catch {
-    toast('Fullscreen is blocked by the browser here', 'err');
-  }
+  toggleImmersive();
 }
 
 /* ── modifier / key chips ──────────────────────────────────────── */

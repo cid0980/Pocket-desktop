@@ -959,3 +959,13 @@ button:disabled { opacity:.48;cursor:not-allowed; }
 
 .layout-editor select { min-height:44px; padding:8px; border-radius:8px; background:#2a405a; color:#fff; border:0; font:inherit; font-size:14px; }
 .layout-editor select:disabled { opacity:.4; }
+
+/* ── immersive fullscreen: bars hidden, picture uses the whole screen ── */
+body.pd-immersive .pad-top, body.pd-immersive .control-top, body.pd-immersive #remote-bar,
+body.pd-immersive #remote-dock, body.pd-immersive .tabbar, body.pd-immersive #mouse-status { display:none !important; }
+body.pd-immersive #remote-stage { top:0 !important; bottom:0 !important; }
+#pd-immersive-exit { position:fixed; z-index:2000; top:calc(var(--safe-t) + 6px); right:calc(var(--safe-r) + 6px); min-height:40px; padding:8px 12px; border-radius:999px; border:1px solid #69d7bb; background:#101c2bf0; color:#e6f7f2; font:600 13px/1 -apple-system,BlinkMacSystemFont,sans-serif; }
+#pd-immersive-exit[hidden] { display:none !important; }
+.layout-editor .le-num { display:flex; align-items:center; gap:4px; font-size:13px; color:#cfe8e1; }
+.layout-editor .le-num input { width:72px; min-height:44px; padding:6px; border-radius:8px; border:0; background:#2a405a; color:#fff; font:inherit; font-size:14px; }
+.layout-editor .le-num input:disabled { opacity:.4; }

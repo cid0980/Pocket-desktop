@@ -42,9 +42,9 @@ for(const page of ['mouse','pad','remote']) {
  await ev("pocketLayouts.action('save')");
  check(page+' layout saves locally',await ev(`Object.keys(JSON.parse(localStorage.getItem('pd-layouts-v1')).pages.${page}).length>0`));
  await click(`#screen-${page} [data-fullscreen]`);await c.sleep(150);
- check(page+' enters fullscreen',await ev('!!document.fullscreenElement'));
+ check(page+' enters fullscreen',await ev("document.body.classList.contains('pd-immersive')"));
  await click(`#screen-${page} [data-fullscreen]`);await c.sleep(100);
- check(page+' exits fullscreen',await ev('!document.fullscreenElement'));
+ check(page+' exits fullscreen',await ev("!document.body.classList.contains('pd-immersive')"));
 }
 await click('[data-edit="remote"]');pt=await box('#remote-left');await touch('touchStart',pt);await touch('touchMove',{x:150,y:400});await touch('touchEnd');
 check('remote click button moves independently in viewport',await ev("(()=>{const r=document.querySelector('#remote-left').getBoundingClientRect();return Math.abs(r.x+r.width/2-150)<3&&Math.abs(r.y+r.height/2-400)<3})()"));

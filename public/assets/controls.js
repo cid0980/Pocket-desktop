@@ -1,18 +1,28 @@
 /* Shared controller utilities. No network or third-party dependencies. */
-export async function fullscreen(toast) {
-  try {
-    if (document.fullscreenElement) await document.exitFullscreen();
-    else if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen();
-    else throw Error('Fullscreen is unsupported here. Try your browser menu or install the app on a trusted HTTPS connection.');
-  } catch (e) { toast(e.message || 'Fullscreen was blocked by this browser.', 'err', 7000); }
+/** Immersive mode hides the app's top bars and bottom controls so the picture uses the whole screen. */
+export function isImmersive() { return document.body.classList.contains('pd-immersive'); }
+function immersiveExitButton() {
+  let b = document.getElementById('pd-immersive-exit');
+  if (!b) {
+    b = document.createElement('button');
+    b.id = 'pd-immersive-exit'; b.type = 'button'; b.textContent = 'Exit fullscreen'; b.hidden = true;
+    b.addEventListener('click', () => toggleImmersive());
+    document.body.append(b);
+  }
+  return b;
 }
-document.addEventListener('fullscreenchange', () => {
+export function toggleImmersive() {
+  const on = !isImmersive();
+  document.body.classList.toggle('pd-immersive', on);
+  immersiveExitButton().hidden = !on;
   document.querySelectorAll('[data-fullscreen]').forEach(b => {
-    if(!b.hasAttribute('data-compact')) b.textContent=document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen';
-    b.setAttribute('aria-label',document.fullscreenElement ? 'Exit fullscreen':'Fullscreen');
-    b.setAttribute('aria-pressed', String(!!document.fullscreenElement));
+    if (!b.hasAttribute('data-compact')) b.textContent = on ? 'Exit fullscreen' : 'Fullscreen';
+    b.setAttribute('aria-label', on ? 'Exit fullscreen' : 'Fullscreen');
+    b.setAttribute('aria-pressed', String(on));
   });
-});
+  window.dispatchEvent(new Event('resize'));
+}
+export async function fullscreen(toast) { toggleImmersive(); }
 
 export class MotionPointer {
   constructor(send, status, sensitivity = () => 1) {
@@ -103,11 +113,16 @@ export class LayoutEditor {
 
     // Layouts saved before v3 stored the whole pad face/system groups as one item. Those cannot map to
     // individual buttons, so drop them (the buttons then use their default place) instead of rejecting everything.
+    this.headerNodes = new Set();
+    for (const nodes of Object.values(this.nodes)) for (const el of Object.values(nodes))
+      if (el.closest('.pad-top, .control-top, #remote-bar')) this.headerNodes.add(el);
     try {
       const raw = localStorage.getItem(this.key);
       if (raw) {
         const data = JSON.parse(raw);
-        if (data?.pages?.pad) { delete data.pages.pad['pad-face']; delete data.pages.pad['pad-system']; }
+        // Drop ids that no longer exist (e.g. older grouped items such as pad-face or remote-dock).
+        if (data?.pages) for (const page of Object.keys(data.pages))
+          for (const k of Object.keys(data.pages[page] || {})) if (!this.nodes[page]?.[k]) delete data.pages[page][k];
         this.saved = this.validate(data);
       }
     } catch { toast('Saved layouts were unreadable or outdated; using defaults.'); }
@@ -127,6 +142,8 @@ export class LayoutEditor {
         <div class="le-row">
           <button type="button" data-op="smaller" disabled aria-label="Smaller">−</button>
           <button type="button" data-op="bigger" disabled aria-label="Bigger">+</button>
+          <label class="le-num">W% <input type="number" data-op="w" min="50" max="250" step="1" disabled></label>
+          <label class="le-num">H% <input type="number" data-op="h" min="50" max="250" step="1" disabled></label>
           <select data-op="shape" disabled aria-label="Shape">
             <option value="">Shape: default</option>
             <option value="circle">Circle</option>
@@ -149,14 +166,26 @@ export class LayoutEditor {
     document.body.append(this.panel);
     this.panel.addEventListener('click', e => {
       const b = e.target.closest('[data-op]');
-      if (!b || b.disabled || b.tagName === 'SELECT') return;
+      if (!b || b.disabled || b.tagName === 'SELECT' || b.tagName === 'INPUT') return;
       if (b.dataset.op === 'show') this.unhide(b.dataset.id);
       else this.action(b.dataset.op);
     });
-    this.panel.addEventListener('change', e => {
-      if (e.target.dataset.op === 'shape') this.setShape(this.page, this.selected, e.target.value);
+    // Enter in a size box applies it (blur fires the change event).
+    this.panel.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && (e.target.dataset.op === 'w' || e.target.dataset.op === 'h')) e.target.blur();
     });
-    this.panel.querySelector('input').addEventListener('change', async e => {
+    this.panel.addEventListener('change', e => {
+      const op = e.target.dataset.op;
+      if (op === 'shape') this.setShape(this.page, this.selected, e.target.value);
+      if ((op === 'w' || op === 'h') && this.selected && this.draft.pages[this.page][this.selected]) {
+        const v = Number(e.target.value);
+        if (!Number.isFinite(v) || v <= 0) { this.renderTools(); return; }
+        const cur = this.draft.pages[this.page][this.selected];
+        if (op === 'w') this.setSize(this.page, this.selected, v / 100, cur.sy);
+        else this.setSize(this.page, this.selected, cur.sx, v / 100);
+      }
+    });
+    this.panel.querySelector('input[type="file"]').addEventListener('change', async e => {
       try {
         const file = e.target.files[0]; if (!file) return;
         if (file.size > 100000) throw Error('File too large');
@@ -247,7 +276,8 @@ export class LayoutEditor {
     b.setAttribute('aria-expanded', String(!on)); b.textContent = on ? 'Tools ▴' : 'Tools ▾';
   }
 
-  topInset(page) {
+  topInset(page, id) {
+    if (id && this.headerNodes.has(this.nodes[page][id])) return 8;
     return page === 'pad' ? Math.max(8, this.pages.pad.querySelector('.pad-top').getBoundingClientRect().bottom + 8) : 8;
   }
 
@@ -263,7 +293,7 @@ export class LayoutEditor {
     const cur = this.draft.pages[page];
     if (cur[id]) return cur[id];
     const r = this.nodes[page][id].getBoundingClientRect();
-    const top = this.topInset(page);
+    const top = this.topInset(page, id);
     cur[id] = {
       x: clamp01((r.left - 8) / Math.max(1, innerWidth - r.width - 16)),
       y: clamp01((r.top - top) / Math.max(1, innerHeight - r.height - top - 8)),
@@ -289,7 +319,7 @@ export class LayoutEditor {
   move(e) {
     const d = this.drag; if (!d || e.pointerId !== d.pointer) return;
     e.preventDefault(); e.stopImmediatePropagation();
-    const top = this.topInset(d.page), { w, h } = this.size(d.page, d.id);
+    const top = this.topInset(d.page, d.id), { w, h } = this.size(d.page, d.id);
     const cur = this.draft.pages[d.page][d.id];
     cur.x = clamp01((e.clientX - d.ox - 8) / Math.max(1, innerWidth - w - 16));
     cur.y = clamp01((e.clientY - d.oy - top) / Math.max(1, innerHeight - h - top - 8));
@@ -301,7 +331,7 @@ export class LayoutEditor {
     const cur = this.draft.pages[page][id];
     const r = this.nodes[page][id].getBoundingClientRect();
     cur.sx = clampScale(sx); cur.sy = clampScale(sy);
-    const top = this.topInset(page), { w, h } = this.size(page, id);
+    const top = this.topInset(page, id), { w, h } = this.size(page, id);
     cur.x = clamp01((r.left - 8) / Math.max(1, innerWidth - w - 16));
     cur.y = clamp01((r.top - top) / Math.max(1, innerHeight - h - top - 8));
     this.apply();
@@ -335,11 +365,10 @@ export class LayoutEditor {
         const r = el.getBoundingClientRect();
         if (r.width > 0 && r.height > 0) this.natural[page][id] = { w: r.width, h: r.height };
       }
-      const top = this.topInset(page);
       for (const [id, el] of Object.entries(nodes)) {
         const pos = this.draft.pages[page][id]; const n = this.natural[page][id];
         if (!pos || !n) continue;
-        const { w, h } = this.size(page, id);
+        const { w, h } = this.size(page, id), top = this.topInset(page, id);
         Object.assign(el.style, {
           position: 'fixed', right: 'auto', bottom: 'auto', margin: '0', zIndex: '12',
           width: n.w + 'px', height: n.h + 'px', transformOrigin: '0 0',
@@ -367,6 +396,11 @@ export class LayoutEditor {
     for (const op of ['smaller', 'bigger', 'hide']) this.panel.querySelector(`[data-op="${op}"]`).disabled = !pos;
     const shapeSel = this.panel.querySelector('[data-op="shape"]');
     shapeSel.disabled = !pos; shapeSel.value = pos?.shape || '';
+    for (const [op, v] of [['w', pos?.sx], ['h', pos?.sy]]) {
+      const input = this.panel.querySelector(`[data-op="${op}"]`);
+      input.disabled = !pos;
+      if (document.activeElement !== input) input.value = pos ? Math.round(v * 100) : '';
+    }
     this.panel.querySelector('[data-op="hide"]').textContent = pos?.h ? 'Show' : 'Hide';
 
     const list = this.panel.querySelector('[data-hidden-list]');
@@ -422,7 +456,7 @@ export class LayoutEditor {
       } catch (e) { this.message('Could not save: ' + e.message, true); }
     }
     if (op === 'cancel') this.finish();
-    if (op === 'import') this.panel.querySelector('input').click();
+    if (op === 'import') this.panel.querySelector('input[type="file"]').click();
     if (op === 'export') {
       const url = URL.createObjectURL(new Blob([JSON.stringify(this.draft, null, 2)], { type: 'application/json' }));
       const a = document.createElement('a'); a.href = url; a.download = 'pocket-desktop-layouts.json'; a.click();
