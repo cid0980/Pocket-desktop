@@ -14,6 +14,8 @@ function listen(target, type, fn) { target?.addEventListener(type, fn, {signal: 
 
 const PAD_DEFAULTS = {
   sensitivity: 1,
+  moveSensitivity: 1,
+  lookSensitivity: 1,
   deadzone: 0.12,
   motionSensitivity: 1,
   invertY: false,
@@ -212,11 +214,11 @@ class GamepadScreen {
     // Left stick = movement, right stick = camera.
     this.left = new Stick(root.querySelector('#pad-move'), {
       radius: 64, label: 'move',
-      onChange: (x, y) => this.setAxis('lx', x, 'ly', y),
+      onChange: (x, y) => this.setAxis('lx', x, 'ly', y, this.settings.moveSensitivity),
     });
     this.right = new Stick(root.querySelector('#pad-look'), {
       radius: 56, label: 'look',
-      onChange: (x, y) => this.setAxis('rx', x, 'ry', y),
+      onChange: (x, y) => this.setAxis('rx', x, 'ry', y, this.settings.lookSensitivity),
     });
 
     // Face buttons, triggers, sticks-as-buttons
@@ -288,13 +290,13 @@ class GamepadScreen {
   }
 
   /** Apply deadzone + sensitivity to a stick value (-1..1) → axis units. */
-  setAxis(ax, x, ay, y) {
+  setAxis(ax, x, ay, y, sens = this.settings.sensitivity) {
     const dead = this.settings.deadzone;
     const scale = (v) => {
       const mag = Math.hypot(x, y);
       if (mag < dead) return 0;
       const boosted = ((mag - dead) / (1 - dead)) / mag;
-      return Math.max(-1, Math.min(1, v * boosted * this.settings.sensitivity));
+      return Math.max(-1, Math.min(1, v * boosted * sens));
     };
     this.setAxisRaw(ax, Math.round(scale(x) * 32767));
     this.setAxisRaw(ay, Math.round(scale(y) * 32767));

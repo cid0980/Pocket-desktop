@@ -310,8 +310,16 @@
         <button class="btn" data-edit="pad">Customize gamepad layout</button>
         <p class="muted small">v1.4.1 · Tap a control, drag to move, corner handle or + / − to resize, Hide to remove it from view. Save keeps changes; Cancel restores the last saved layout.</p>
         <label class="row between">
-          <span>Aim sensitivity</span>
+          <span>Motion aim sensitivity</span>
           <input type="range" id="pad-sens" min="0.3" max="2.5" step="0.1" value="1">
+        </label>
+        <label class="row between">
+          <span>Move stick sensitivity</span>
+          <input type="range" id="pad-move-sens" min="0.3" max="2.5" step="0.1" value="1">
+        </label>
+        <label class="row between">
+          <span>Look stick sensitivity</span>
+          <input type="range" id="pad-look-sens" min="0.3" max="2.5" step="0.1" value="1">
         </label>
         <p class="muted small">Left stick moves, right stick looks. Triggers are analog.
           Turn on <b>Motion</b> to aim by tilting the phone.</p>

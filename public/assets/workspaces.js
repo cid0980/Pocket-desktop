@@ -5,7 +5,7 @@ export function settingsNavigation({onAction,onClose}) {
   // Keep original control IDs/listeners when moving advanced options into categories.
   $('#mouse-timing-settings').append($('#mouse-tap-interval').closest('label'),$('#mouse-preference-status'));
   const motion=$('.mouse-motion-settings');motion.open=true;$('#motion-settings-content').append(motion);
-  $('#gamepad-aim-settings').append($('#pad-sens').closest('label'));
+  $('#gamepad-aim-settings').append($('#pad-move-sens').closest('label'), $('#pad-look-sens').closest('label'), $('#pad-sens').closest('label'));
   $('#pad-panel')?.remove();
   const speedLabel=document.createElement('label');speedLabel.className='field';
   speedLabel.innerHTML='<span>Pointer speed <output id="settings-speed-value"></output></span><input id="settings-mouse-speed" type="range" min="0.2" max="2" step="0.05"><small>Slow 0.20× · Fast 2.00×. Scroll speed is separate.</small>';

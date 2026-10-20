@@ -97,6 +97,11 @@ const fmtUptime = (s) => {
   return `${m}m`;
 };
 
+/** Gamepad stick sensitivity (0.3–2.5), saved per browser. Defaults to 1. */
+function readStickSens(key) {
+  try { const v = Number(localStorage.getItem(key)); return v >= 0.3 && v <= 2.5 ? v : 1; } catch { return 1; }
+}
+
 /* ── state ─────────────────────────────────────────────────────── */
 
 const state = {
@@ -274,7 +279,7 @@ async function openPad() {
   if (padScreen) { padScreen.onExit = () => {}; padScreen.exit(); }
   padScreen = new window.PocketPad.GamepadScreen({
     socket: controlSocket,
-    settings: {motionSensitivity:Number($('#pad-sens').value)||1},
+    settings: {motionSensitivity:Number($('#pad-sens').value)||1, moveSensitivity:readStickSens('pd-pad-move-sensitivity'), lookSensitivity:readStickSens('pd-pad-look-sensitivity')},
     onToast: toast,
     onExit: () => {
       padScreen = null;
@@ -433,6 +438,14 @@ $('#pad-settings').addEventListener('click',()=>openSettings('gamepad'));
 $('#settings-gestures').addEventListener('click',()=>openSheet('sheet-gestures'));
 $('#settings-connect-motion').addEventListener('click',async()=>{closeSheets();await openMouse();await openSettings('motion');});
 try{const saved=Number(localStorage.getItem('pd-pad-motion-sensitivity'));if(saved>=.3&&saved<=2.5)$('#pad-sens').value=saved;}catch{}
+for (const [id, key, prop] of [['#pad-move-sens','pd-pad-move-sensitivity','moveSensitivity'],['#pad-look-sens','pd-pad-look-sensitivity','lookSensitivity']]) {
+  const input = $(id); input.value = readStickSens(key);
+  input.addEventListener('input', e => {
+    const value = Number(e.target.value);
+    if (padScreen) padScreen.settings[prop] = value;
+    try { localStorage.setItem(key, String(value)); } catch { /* storage may be blocked */ }
+  });
+}
 $('#pad-sens').addEventListener('input',e=>{const value=Number(e.target.value);if(padScreen)padScreen.settings.motionSensitivity=value;try{localStorage.setItem('pd-pad-motion-sensitivity',String(value));}catch{}});
 // Reserve actual dock height so controls never cover the remote picture by default.
 new ResizeObserver(()=>{
