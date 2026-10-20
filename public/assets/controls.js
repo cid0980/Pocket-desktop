@@ -43,6 +43,12 @@ function browserFullscreen(on) {
     document.exitFullscreen().catch(() => {});
   }
 }
+/** Show or hide only the app's bars and menu, keeping browser fullscreen as it is (used while editing a layout). */
+export function setImmersiveBars(on) {
+  document.body.classList.toggle('pd-immersive', on);
+  immersiveMenu().hidden = !on;
+  window.dispatchEvent(new Event('resize'));
+}
 export function toggleImmersive() {
   const on = !isImmersive();
   document.body.classList.toggle('pd-immersive', on);

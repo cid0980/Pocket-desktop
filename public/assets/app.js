@@ -4,7 +4,7 @@ import { RemoteSession } from './remote.js';
 import './pad.js';
 import {screenshotViewer} from './screenshot-viewer.js';
 import {settingsNavigation, keyboardWorkspace} from './workspaces.js';
-import { LayoutEditor, fullscreen, toggleImmersive, MotionPointer, bindMouseButton, bindTouchpad, bindScrollStrip } from './controls.js';
+import { LayoutEditor, fullscreen, toggleImmersive, setImmersiveBars, isImmersive, MotionPointer, bindMouseButton, bindTouchpad, bindScrollStrip } from './controls.js';
 
 /* ── tiny helpers ──────────────────────────────────────────────── */
 
@@ -383,7 +383,7 @@ for(const [page,selectors] of Object.entries(layoutSelectors)) for(const selecto
 const layouts = new LayoutEditor(pageRoots,toast); window.pocketLayouts=layouts;
 // After Save or Cancel, return to fullscreen if the editor was opened from it.
 const finishLayouts=layouts.finish.bind(layouts);
-layouts.finish=()=>{ finishLayouts(); if(resumeImmersive){ resumeImmersive=false; toggleImmersive(); } };
+layouts.finish=()=>{ finishLayouts(); if(resumeImmersive){ resumeImmersive=false; setImmersiveBars(true); } };
 /** Start layout editing for a page. Leaves fullscreen so the top bar and every control are visible. */
 let resumeImmersive=false;
 function beginLayout(page){
@@ -409,7 +409,8 @@ document.addEventListener('pd:customize',()=>{
   const screen=SCREENS.find(s=>!$('#screen-'+s)?.hidden);
   const page={remote:'remote',pad:'pad',mouse:'mouse'}[screen];
   if(!page) return toast('Layout editing is not available on this screen','err');
-  if(document.body.classList.contains('pd-immersive')){ resumeImmersive=true; toggleImmersive(); }
+  // Stay in browser fullscreen; only show the app's bars while editing so every control can be moved.
+  if(isImmersive()){ resumeImmersive=true; setImmersiveBars(false); }
   beginLayout(page);
 });
 
