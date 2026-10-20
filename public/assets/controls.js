@@ -1,15 +1,31 @@
 /* Shared controller utilities. No network or third-party dependencies. */
 /** Immersive mode hides the app's top bars and bottom controls so the picture uses the whole screen. */
 export function isImmersive() { return document.body.classList.contains('pd-immersive'); }
-function immersiveExitButton() {
-  let b = document.getElementById('pd-immersive-exit');
-  if (!b) {
-    b = document.createElement('button');
-    b.id = 'pd-immersive-exit'; b.type = 'button'; b.textContent = 'Exit fullscreen'; b.hidden = true;
-    b.addEventListener('click', () => toggleImmersive());
-    document.body.append(b);
+/** Floating Menu in fullscreen: keeps Customize layout and Exit reachable, outside the top bar. */
+function immersiveMenu() {
+  let wrap = document.getElementById('pd-immersive-menu-wrap');
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.id = 'pd-immersive-menu-wrap'; wrap.hidden = true;
+    wrap.innerHTML = `<button type="button" id="pd-immersive-menu" aria-expanded="false" aria-label="Fullscreen menu">Menu</button>
+      <div id="pd-immersive-panel" hidden>
+        <button type="button" data-imm="layout">Customize layout</button>
+        <button type="button" data-imm="exit">Exit fullscreen</button>
+      </div>`;
+    document.body.append(wrap);
+    const menu = wrap.querySelector('#pd-immersive-menu');
+    const panel = wrap.querySelector('#pd-immersive-panel');
+    menu.addEventListener('click', () => {
+      panel.hidden = !panel.hidden; menu.setAttribute('aria-expanded', String(!panel.hidden));
+    });
+    panel.addEventListener('click', e => {
+      const op = e.target.closest('[data-imm]')?.dataset.imm;
+      panel.hidden = true; menu.setAttribute('aria-expanded', 'false');
+      if (op === 'exit') toggleImmersive();
+      if (op === 'layout') document.dispatchEvent(new CustomEvent('pd:customize'));
+    });
   }
-  return b;
+  return wrap;
 }
 let immersiveToast = () => {};
 /** Ask the browser for real fullscreen (hides address and status bars where allowed). Best effort. */
@@ -26,7 +42,7 @@ function browserFullscreen(on) {
 export function toggleImmersive() {
   const on = !isImmersive();
   document.body.classList.toggle('pd-immersive', on);
-  immersiveExitButton().hidden = !on;
+  immersiveMenu().hidden = !on;
   document.querySelectorAll('[data-fullscreen]').forEach(b => {
     if (!b.hasAttribute('data-compact')) b.textContent = on ? 'Exit fullscreen' : 'Fullscreen';
     b.setAttribute('aria-label', on ? 'Exit fullscreen' : 'Fullscreen');

@@ -381,14 +381,28 @@ for(const [page,selectors] of Object.entries(layoutSelectors)) for(const selecto
   });
 }
 const layouts = new LayoutEditor(pageRoots,toast); window.pocketLayouts=layouts;
-$$('[data-edit]').forEach(el=>el.addEventListener('click',()=> {
+// After Save or Cancel, return to fullscreen if the editor was opened from it.
+const finishLayouts=layouts.finish.bind(layouts);
+layouts.finish=()=>{ finishLayouts(); if(resumeImmersive){ resumeImmersive=false; toggleImmersive(); } };
+/** Start layout editing for a page. Leaves fullscreen so the top bar and every control are visible. */
+let resumeImmersive=false;
+function beginLayout(page){
   padScreen?.releaseAll(); padScreen?.motionController.stop(); mouseMotion?.stop();
   state.session?.input?.reset();
   for(const b of ['left','right']) controlSocket?.send({t:'btn',b,d:0});
   mouseInput?.reset();mouseScroll?.reset();
   $('#pad-panel')?.classList.remove('open');
-  layouts.begin(el.dataset.edit);
-}));
+  layouts.begin(page);
+}
+$$('[data-edit]').forEach(el=>el.addEventListener('click',()=> beginLayout(el.dataset.edit)));
+document.addEventListener('pd:customize',()=>{
+  const screen=SCREENS.find(s=>!$('#screen-'+s)?.hidden);
+  const page={remote:'remote',pad:'pad',mouse:'mouse'}[screen];
+  if(!page) return toast('Layout editing is not available on this screen','err');
+  if(document.body.classList.contains('pd-immersive')){ resumeImmersive=true; toggleImmersive(); }
+  beginLayout(page);
+});
+
 
 
 let keyboardReturn='home', keyboardMouseReturn='home';
