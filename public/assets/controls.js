@@ -11,6 +11,18 @@ function immersiveExitButton() {
   }
   return b;
 }
+let immersiveToast = () => {};
+/** Ask the browser for real fullscreen (hides address and status bars where allowed). Best effort. */
+function browserFullscreen(on) {
+  const el = document.documentElement;
+  if (on && !document.fullscreenElement && el.requestFullscreen) {
+    el.requestFullscreen({ navigationUI: 'hide' }).catch(() => {
+      immersiveToast('The browser blocked full screen on this address. The app is still full screen. For full screen with the address bar hidden, open it over HTTPS (run.sh --tls).', 'err', 8000);
+    });
+  } else if (!on && document.fullscreenElement) {
+    document.exitFullscreen().catch(() => {});
+  }
+}
 export function toggleImmersive() {
   const on = !isImmersive();
   document.body.classList.toggle('pd-immersive', on);
@@ -20,9 +32,14 @@ export function toggleImmersive() {
     b.setAttribute('aria-label', on ? 'Exit fullscreen' : 'Fullscreen');
     b.setAttribute('aria-pressed', String(on));
   });
+  browserFullscreen(on);
   window.dispatchEvent(new Event('resize'));
 }
-export async function fullscreen(toast) { toggleImmersive(); }
+// Leaving browser fullscreen (system back/gesture) also leaves the app's fullscreen.
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement && isImmersive()) toggleImmersive();
+});
+export async function fullscreen(toast) { immersiveToast = toast || immersiveToast; toggleImmersive(); }
 
 export class MotionPointer {
   constructor(send, status, sensitivity = () => 1) {
