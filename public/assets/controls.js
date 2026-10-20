@@ -207,6 +207,7 @@ export class LayoutEditor {
       </div>
       <input type="file" accept="application/json,.json" hidden>`;
     document.body.append(this.panel);
+    this.initToolbarDrag();
     this.panel.addEventListener('click', e => {
       const b = e.target.closest('[data-op]');
       if (!b || b.disabled || b.tagName === 'SELECT' || b.tagName === 'INPUT') return;
@@ -300,7 +301,7 @@ export class LayoutEditor {
   begin(page) {
     if (this.editing) return;
     this.page = page; this.editing = true; this.selected = null; this.draft = clone(this.saved);
-    this.panel.hidden = false; this.setCollapsed(true);
+    this.panel.hidden = false; this.setCollapsed(true); this.applyToolbarPos();
     this.pages[page].classList.add('layout-editing');
     this.pages[page].querySelectorAll('[data-edit]').forEach(b => b.setAttribute('aria-pressed', 'true'));
     this.message('Changes are not saved yet.');
@@ -312,6 +313,45 @@ export class LayoutEditor {
     if (important && this.collapsed) this.toast(text, '', 5000);
   }
 
+  /** The toolbar can be dragged by its header anywhere on screen. The position is remembered on this browser. */
+  initToolbarDrag() {
+    const head = this.panel.querySelector('.le-head');
+    head.style.touchAction = 'none'; head.style.cursor = 'move';
+    let grab = null;
+    head.addEventListener('pointerdown', e => {
+      if (e.button !== 0 || e.target.closest('button,select,input,label')) return;
+      const r = this.panel.getBoundingClientRect();
+      grab = { id: e.pointerId, dx: e.clientX - r.left, dy: e.clientY - r.top };
+      head.setPointerCapture(e.pointerId); e.preventDefault();
+    });
+    head.addEventListener('pointermove', e => {
+      if (!grab || e.pointerId !== grab.id) return;
+      this.placeToolbar(e.clientX - grab.dx, e.clientY - grab.dy, false);
+    });
+    const end = e => {
+      if (!grab || e.pointerId !== grab.id) return;
+      grab = null;
+      const r = this.panel.getBoundingClientRect();
+      this.placeToolbar(r.left, r.top, true);
+    };
+    head.addEventListener('pointerup', end); head.addEventListener('pointercancel', end);
+    window.addEventListener('resize', () => { if (!this.panel.hidden && this.toolPos) this.placeToolbar(this.toolPos.x, this.toolPos.y, false); });
+  }
+  placeToolbar(x, y, save) {
+    const w = Math.min(560, innerWidth - 16);
+    const h = this.panel.offsetHeight;
+    x = Math.max(0, Math.min(x, innerWidth - w));
+    y = Math.max(0, Math.min(y, innerHeight - Math.min(h, 60)));
+    Object.assign(this.panel.style, { left: x + 'px', top: y + 'px', right: 'auto', bottom: 'auto', width: w + 'px' });
+    this.toolPos = { x, y };
+    if (save) { try { localStorage.setItem('pd-layout-toolbar-pos', JSON.stringify(this.toolPos)); } catch {} }
+  }
+  applyToolbarPos() {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem('pd-layout-toolbar-pos') || 'null'); } catch {}
+    if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) this.placeToolbar(saved.x, saved.y, false);
+    else { this.toolPos = null; Object.assign(this.panel.style, { left: '', top: '', right: '', bottom: '', width: '' }); }
+  }
   setCollapsed(on) {
     this.collapsed = on;
     this.panel.classList.toggle('collapsed', on);
