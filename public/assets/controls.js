@@ -64,113 +64,342 @@ export class MotionPointer {
   }
 }
 
+const MIN_SCALE = 0.5, MAX_SCALE = 2.5;
+const clone = (v) => JSON.parse(JSON.stringify(v));
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
+
+/**
+ * Layout editor v2.
+ * Stored per control: {x, y, s, h}
+ *   x,y  normalized position (0..1) inside the viewport
+ *   s    size multiplier (0.5..2.5)
+ *   h    hidden flag (hidden controls stay in the editor, dashed, so they can be shown again)
+ * Version 1 files ({x,y} only) are still accepted and upgraded on save.
+ */
 export class LayoutEditor {
   constructor(pages, toast) {
-    this.pages = pages; this.toast = toast; this.key = 'pd-layouts-v1'; this.saved = this.empty();
-    this.nodes = {};
+    this.pages = pages; this.toast = toast; this.key = 'pd-layouts-v1';
+    this.saved = this.empty(); this.nodes = {}; this.natural = {};
+    this.editing = false; this.page = null; this.selected = null; this.collapsed = false;
+    this.drag = null; this.resizing = null;
+
     for (const [page, root] of Object.entries(pages)) {
-      this.nodes[page] = {};
+      this.nodes[page] = {}; this.natural[page] = {};
       root.querySelectorAll('[data-layout]').forEach(el => { this.nodes[page][el.dataset.layout] = el; });
-      root.addEventListener('pointerdown', e => this.down(e,page), true);
+      root.addEventListener('pointerdown', e => this.down(e, page), true);
       root.addEventListener('pointermove', e => this.move(e), true);
-      for (const event of ['pointerup','pointercancel']) root.addEventListener(event, e => {
-        if (!this.editing) return; e.stopImmediatePropagation(); e.preventDefault(); this.drag = null;
+      for (const event of ['pointerup', 'pointercancel']) root.addEventListener(event, e => {
+        if (!this.editing) return; e.stopImmediatePropagation(); e.preventDefault(); this.drag = null; this.panel.classList.remove('dragging');
       }, true);
-      root.addEventListener('click', e => { if (this.editing && e.target.closest('[data-layout]')) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+      root.addEventListener('click', e => {
+        if (this.editing && e.target.closest('[data-layout]')) { e.stopImmediatePropagation(); e.preventDefault(); }
+      }, true);
     }
+
     try { const raw = localStorage.getItem(this.key); if (raw) this.saved = this.validate(JSON.parse(raw)); }
     catch { toast('Saved layouts were unreadable or outdated; using defaults.'); }
-    this.draft = JSON.parse(JSON.stringify(this.saved));
-    this.panel = document.createElement('div'); this.panel.className = 'layout-editor'; this.panel.hidden = true;
-    this.panel.innerHTML = '<strong tabindex="0">Layout editor · drag this heading to move toolbar</strong><div><button data-op="save">Save</button><button data-op="cancel">Cancel</button><button data-op="reset">Reset page</button><button data-op="all">Reset all</button><button data-op="export">Export JSON</button><button data-op="import">Import JSON</button></div><input type="file" accept="application/json,.json" hidden><p role="status">Changes are not saved yet.</p>';
-    document.body.append(this.panel);
-    const heading=this.panel.querySelector('strong'); let toolbarDrag=null;
-    heading.style.touchAction='none'; heading.style.cursor='move';
-    heading.addEventListener('pointerdown',e=>{ const r=this.panel.getBoundingClientRect(); toolbarDrag={x:e.clientX-r.left,y:e.clientY-r.top}; heading.setPointerCapture(e.pointerId); e.preventDefault(); });
-    heading.addEventListener('pointermove',e=>{ if(!toolbarDrag)return; Object.assign(this.panel.style,{transform:'none',left:Math.max(0,Math.min(innerWidth-this.panel.offsetWidth,e.clientX-toolbarDrag.x))+'px',top:Math.max(0,Math.min(innerHeight-this.panel.offsetHeight,e.clientY-toolbarDrag.y))+'px'}); });
-    for(const event of ['pointerup','pointercancel'])heading.addEventListener(event,()=>toolbarDrag=null);
+    this.draft = clone(this.saved);
 
-    this.panel.addEventListener('click', e => this.action(e.target.dataset.op));
+    // Toolbar: fixed to the bottom (above the safe area), never dragged, so it cannot drift over controls.
+    this.panel = document.createElement('div');
+    this.panel.className = 'layout-editor'; this.panel.hidden = true;
+    this.panel.innerHTML = `
+      <div class="le-head">
+        <strong data-sel>Tap a control to select it</strong>
+        <button type="button" data-op="save" class="primary">Save</button>
+        <button type="button" data-op="cancel">Cancel</button>
+        <button type="button" data-op="collapse" aria-expanded="false">Tools ▴</button>
+      </div>
+      <div class="le-body">
+        <div class="le-row">
+          <button type="button" data-op="smaller" disabled aria-label="Smaller">−</button>
+          <button type="button" data-op="bigger" disabled aria-label="Bigger">+</button>
+          <button type="button" data-op="hide" disabled>Hide</button>
+        </div>
+        <div class="le-row" data-hidden-list hidden></div>
+        <div class="le-main">
+          <button type="button" data-op="reset">Reset page</button>
+          <button type="button" data-op="all">Reset all</button>
+          <button type="button" data-op="export">Export JSON</button>
+          <button type="button" data-op="import">Import JSON</button>
+        </div>
+        <div class="le-hint">Tap a control to select it. Drag to move. Drag the corner handle or use + / − to resize.</div>
+        <p role="status">Changes are not saved yet.</p>
+      </div>
+      <input type="file" accept="application/json,.json" hidden>`;
+    document.body.append(this.panel);
+    this.panel.addEventListener('click', e => {
+      const b = e.target.closest('[data-op]');
+      if (!b || b.disabled) return;
+      if (b.dataset.op === 'show') this.unhide(b.dataset.id);
+      else this.action(b.dataset.op);
+    });
     this.panel.querySelector('input').addEventListener('change', async e => {
       try {
-        const file=e.target.files[0]; if (!file) return;
-        if(file.size>100000) throw Error('File too large');
-        const valid=this.validate(JSON.parse(await file.text()));
-        if (!confirm('Replace layout drafts for all pages with this file? Click Save to persist.')) return;
-        this.draft=valid; this.apply(); this.message('Imported and validated. Click Save to keep these layouts.');
-      } catch(err) { this.message('Import rejected: '+err.message); }
-      e.target.value='';
+        const file = e.target.files[0]; if (!file) return;
+        if (file.size > 100000) throw Error('File too large');
+        const valid = this.validate(JSON.parse(await file.text()));
+        if (!confirm('Replace the layout draft for all pages with this file? Click Save to keep it.')) return;
+        this.draft = valid; this.selected = null; this.apply();
+        this.message('Imported and validated. Click Save to keep these layouts.', true);
+      } catch (err) { this.message('Import rejected: ' + err.message, true); }
+      e.target.value = '';
     });
-    this.resize = () => { this.apply(); if(this.editing) this.panel.style.cssText=''; }; window.addEventListener('resize',this.resize);
-    window.visualViewport?.addEventListener('resize',this.resize);
+
+    // Resize handle for the selected control. Lives outside the page roots so it is never treated as a layout item.
+    this.handle = document.createElement('div');
+    this.handle.className = 'layout-handle'; this.handle.hidden = true;
+    this.handle.setAttribute('role', 'presentation');
+    document.body.append(this.handle);
+    this.handle.addEventListener('pointerdown', e => {
+      const page = this.page, id = this.selected;
+      if (!this.editing || !id || !this.draft.pages[page][id]) return;
+      e.preventDefault(); e.stopPropagation();
+      const r = this.nodes[page][id].getBoundingClientRect();
+      this.resizing = { pointer: e.pointerId, page, id, left: r.left, top: r.top,
+        start: Math.max(20, Math.hypot(e.clientX - r.left, e.clientY - r.top)),
+        scale: this.draft.pages[page][id].s };
+      this.panel.classList.add('dragging');
+      this.handle.setPointerCapture(e.pointerId);
+    });
+    this.handle.addEventListener('pointermove', e => {
+      const z = this.resizing; if (!z || e.pointerId !== z.pointer) return;
+      e.preventDefault(); e.stopPropagation();
+      const dist = Math.hypot(e.clientX - z.left, e.clientY - z.top);
+      this.setScale(z.page, z.id, z.scale * dist / z.start);
+    });
+    const endResize = e => { if (this.resizing && e.pointerId === this.resizing.pointer) { this.resizing = null; this.panel.classList.remove('dragging'); } };
+    for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) this.handle.addEventListener(ev, endResize);
+
+    this.resize = () => this.apply();
+    window.addEventListener('resize', this.resize);
+    window.visualViewport?.addEventListener('resize', this.resize);
     this.apply();
   }
-  empty() { return {version:1,pages:{remote:{},pad:{},mouse:{}}}; }
+
+  empty() { return { version: 2, pages: { remote: {}, pad: {}, mouse: {} } }; }
+
   validate(value) {
-    if (!value || value.version!==1 || !value.pages || Object.keys(value.pages).length!==3) throw Error('Expected layout version 1 with remote, pad and mouse pages');
-    const out=this.empty();
-    for(const page of Object.keys(out.pages)) {
-      const entries=value.pages[page];
-      if(!entries || typeof entries!=='object' || Array.isArray(entries)) throw Error('Invalid page '+page);
-      for(const [id,pos] of Object.entries(entries)) {
-        if(!Object.hasOwn(this.nodes[page],id) || !pos || !Number.isFinite(pos.x) || !Number.isFinite(pos.y) || pos.x<0 || pos.x>1 || pos.y<0 || pos.y>1) throw Error('Invalid control position: '+id);
-        out.pages[page][id]={x:pos.x,y:pos.y};
+    if (!value || ![1, 2].includes(value.version) || !value.pages || Object.keys(value.pages).length !== 3)
+      throw Error('Expected a layout file with remote, pad and mouse pages');
+    const out = this.empty();
+    for (const page of Object.keys(out.pages)) {
+      const entries = value.pages[page];
+      if (!entries || typeof entries !== 'object' || Array.isArray(entries)) throw Error('Invalid page ' + page);
+      for (const [id, pos] of Object.entries(entries)) {
+        if (!Object.hasOwn(this.nodes[page], id) || !pos || !Number.isFinite(pos.x) || !Number.isFinite(pos.y)
+            || pos.x < 0 || pos.x > 1 || pos.y < 0 || pos.y > 1)
+          throw Error('Invalid control position: ' + id);
+        const s = pos.s === undefined ? 1 : pos.s;
+        if (!Number.isFinite(s) || s < MIN_SCALE || s > MAX_SCALE) throw Error('Invalid size for ' + id);
+        if (pos.h !== undefined && typeof pos.h !== 'boolean') throw Error('Invalid hidden flag for ' + id);
+        out.pages[page][id] = { x: pos.x, y: pos.y, s, h: !!pos.h };
       }
-    } return out;
+    }
+    return out;
   }
+
   begin(page) {
-    if(this.editing) return;
-    this.panel.style.cssText='';
-    this.page=page; this.editing=true; this.draft=JSON.parse(JSON.stringify(this.saved));
-    this.panel.hidden=false; this.pages[page].classList.add('layout-editing'); this.pages[page].querySelectorAll('[data-edit]').forEach(b=>b.setAttribute('aria-pressed','true')); this.message('Changes are not saved yet.');
+    if (this.editing) return;
+    this.page = page; this.editing = true; this.selected = null; this.draft = clone(this.saved);
+    this.panel.hidden = false; this.setCollapsed(true);
+    this.pages[page].classList.add('layout-editing');
+    this.pages[page].querySelectorAll('[data-edit]').forEach(b => b.setAttribute('aria-pressed', 'true'));
+    this.message('Changes are not saved yet.');
+    this.apply();
   }
-  message(text) { this.panel.querySelector('p').textContent=text; }
-  topInset(page) { return page==='pad' ? Math.max(8, this.pages.pad.querySelector('.pad-top').getBoundingClientRect().bottom+8) : 8; }
-  down(e,page) {
-    if(!this.editing || page!==this.page) return;
+
+  message(text, important = false) {
+    this.panel.querySelector('[role="status"]').textContent = text;
+    if (important && this.collapsed) this.toast(text, '', 5000);
+  }
+  setCollapsed(on) {
+    this.collapsed = on;
+    this.panel.classList.toggle('collapsed', on);
+    this.panel.querySelector('[data-op="collapse"]').setAttribute('aria-expanded', String(!on));
+    this.panel.querySelector('[data-op="collapse"]').textContent = on ? 'Tools ▴' : 'Tools ▾';
+  }
+
+  topInset(page) {
+    return page === 'pad' ? Math.max(8, this.pages.pad.querySelector('.pad-top').getBoundingClientRect().bottom + 8) : 8;
+  }
+
+  /** Scaled on-screen size of a control, based on its measured natural size. */
+  size(page, id) {
+    const n = this.natural[page][id] || { w: 40, h: 40 };
+    const s = this.draft.pages[page][id]?.s ?? 1;
+    return { w: n.w * s, h: n.h * s };
+  }
+
+  /** First touch on a control that has never been moved: store its current place so it can be edited. */
+  ensurePos(page, id) {
+    const cur = this.draft.pages[page];
+    if (cur[id]) return cur[id];
+    const r = this.nodes[page][id].getBoundingClientRect();
+    const top = this.topInset(page);
+    cur[id] = {
+      x: clamp01((r.left - 8) / Math.max(1, innerWidth - r.width - 16)),
+      y: clamp01((r.top - top) / Math.max(1, innerHeight - r.height - top - 8)),
+      s: 1, h: false,
+    };
+    return cur[id];
+  }
+
+  down(e, page) {
+    if (!this.editing || page !== this.page) return;
     e.preventDefault(); e.stopImmediatePropagation();
-    const el=e.target.closest('[data-layout]'); if(!el) return;
-    const r=el.getBoundingClientRect(); this.drag={el,page,id:el.dataset.layout,pointer:e.pointerId,ox:e.clientX-r.left,oy:e.clientY-r.top};
+    const el = e.target.closest('[data-layout]');
+    if (!el) { this.select(null); return; }
+    const id = el.dataset.layout;
+    this.ensurePos(page, id);
+    this.select(id);
+    const r = el.getBoundingClientRect();
+    this.drag = { el, page, id, pointer: e.pointerId, ox: e.clientX - r.left, oy: e.clientY - r.top };
+    this.panel.classList.add('dragging');
     el.setPointerCapture(e.pointerId);
   }
+
   move(e) {
-    const d=this.drag; if(!d || e.pointerId!==d.pointer) return;
+    const d = this.drag; if (!d || e.pointerId !== d.pointer) return;
     e.preventDefault(); e.stopImmediatePropagation();
-    const top=this.topInset(d.page);
-    const w=innerWidth-d.el.offsetWidth-16,h=innerHeight-d.el.offsetHeight-top-8;
-    this.draft.pages[d.page][d.id]={x:Math.max(0,Math.min(1,(e.clientX-d.ox-8)/Math.max(1,w))),y:Math.max(0,Math.min(1,(e.clientY-d.oy-top)/Math.max(1,h)))};
+    const top = this.topInset(d.page), { w, h } = this.size(d.page, d.id);
+    const cur = this.draft.pages[d.page][d.id];
+    cur.x = clamp01((e.clientX - d.ox - 8) / Math.max(1, innerWidth - w - 16));
+    cur.y = clamp01((e.clientY - d.oy - top) / Math.max(1, innerHeight - h - top - 8));
     this.apply(); this.message('Unsaved changes');
   }
+
+  /** Change size but keep the control's top-left corner where it is. */
+  setScale(page, id, s) {
+    const cur = this.draft.pages[page][id];
+    const r = this.nodes[page][id].getBoundingClientRect();
+    cur.s = Math.round(Math.max(MIN_SCALE, Math.min(MAX_SCALE, s)) * 100) / 100;
+    const top = this.topInset(page), { w, h } = this.size(page, id);
+    cur.x = clamp01((r.left - 8) / Math.max(1, innerWidth - w - 16));
+    cur.y = clamp01((r.top - top) / Math.max(1, innerHeight - h - top - 8));
+    this.apply(); this.message(`Size ${Math.round(cur.s * 100)}%`);
+  }
+
+  select(id) { this.selected = id; this.apply(); }
+
+  labelOf(page, id) {
+    const el = this.nodes[page][id];
+    return el.getAttribute('aria-label') || el.textContent.trim().replace(/\s+/g, ' ').slice(0, 24) || id;
+  }
+
   apply() {
-    for(const [page,nodes] of Object.entries(this.nodes)) {
-      for(const el of Object.values(nodes)) for(const prop of ['position','left','top','right','bottom','transform','z-index','margin','width','height']) el.style.removeProperty(prop);
-      if(this.pages[page].hidden) continue;
-      const sizes=Object.fromEntries(Object.entries(nodes).map(([id,el])=>[id,el.getBoundingClientRect()]));
-      for(const [id,el] of Object.entries(nodes)) {
-        const pos=this.draft.pages[page][id]; if(!pos) continue;
-        const size=sizes[id];
-        const top=this.topInset(page);
-        const width=Math.min(size.width,innerWidth-16),height=Math.min(size.height,innerHeight-top-8);
-        Object.assign(el.style,{width:width+'px',height:height+'px',position:'fixed',right:'auto',bottom:'auto',transform:'none',margin:'0',zIndex:'12',left:(8+pos.x*Math.max(0,innerWidth-width-16))+'px',top:(top+pos.y*Math.max(0,innerHeight-height-top-8))+'px'});
+    for (const [page, nodes] of Object.entries(this.nodes)) {
+      for (const el of Object.values(nodes)) {
+        for (const prop of ['position', 'left', 'top', 'right', 'bottom', 'transform', 'transform-origin', 'z-index', 'margin', 'width', 'height', 'display'])
+          el.style.removeProperty(prop);
+        el.classList.remove('layout-hidden', 'layout-selected');
+      }
+      if (this.pages[page].hidden) continue;
+      // Measure natural sizes with no inline styles applied.
+      for (const [id, el] of Object.entries(nodes)) {
+        const r = el.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) this.natural[page][id] = { w: r.width, h: r.height };
+      }
+      const top = this.topInset(page);
+      for (const [id, el] of Object.entries(nodes)) {
+        const pos = this.draft.pages[page][id]; const n = this.natural[page][id];
+        if (!pos || !n) continue;
+        const { w, h } = this.size(page, id);
+        Object.assign(el.style, {
+          position: 'fixed', right: 'auto', bottom: 'auto', margin: '0', zIndex: '12',
+          width: n.w + 'px', height: n.h + 'px', transformOrigin: '0 0', transform: `scale(${pos.s})`,
+          left: (8 + pos.x * Math.max(0, innerWidth - w - 16)) + 'px',
+          top: (top + pos.y * Math.max(0, innerHeight - h - top - 8)) + 'px',
+        });
+        if (pos.h) {
+          if (this.editing) el.classList.add('layout-hidden'); else el.style.display = 'none';
+        }
+        if (this.editing && page === this.page && id === this.selected) el.classList.add('layout-selected');
+      }
+    }
+    this.renderTools(); this.placeHandle();
+  }
+
+  renderTools() {
+    if (!this.editing) return;
+    const page = this.page, id = this.selected, pos = id && this.draft.pages[page][id];
+    const sel = this.panel.querySelector('[data-sel]');
+    sel.textContent = pos ? `${this.labelOf(page, id)}${pos.h ? ' (hidden)' : ''} · ${Math.round(pos.s * 100)}%`
+                          : 'Tap a control to select it';
+    for (const op of ['smaller', 'bigger', 'hide']) this.panel.querySelector(`[data-op="${op}"]`).disabled = !pos;
+    this.panel.querySelector('[data-op="hide"]').textContent = pos?.h ? 'Show' : 'Hide';
+
+    const list = this.panel.querySelector('[data-hidden-list]');
+    const hiddenIds = Object.keys(this.draft.pages[page]).filter(k => this.draft.pages[page][k].h && this.nodes[page][k]);
+    list.replaceChildren();
+    list.hidden = !hiddenIds.length;
+    if (hiddenIds.length) {
+      const label = document.createElement('span'); label.textContent = 'Hidden:';
+      list.append(label);
+      for (const hid of hiddenIds) {
+        const b = document.createElement('button');
+        b.type = 'button'; b.dataset.op = 'show'; b.dataset.id = hid;
+        b.textContent = '+ ' + this.labelOf(page, hid);
+        list.append(b);
       }
     }
   }
+
+  placeHandle() {
+    const page = this.page, id = this.selected;
+    const show = this.editing && id && !this.pages[page].hidden && this.draft.pages[page][id];
+    this.handle.hidden = !show;
+    if (!show) return;
+    const r = this.nodes[page][id].getBoundingClientRect();
+    Object.assign(this.handle.style, { left: (r.right - 22) + 'px', top: (r.bottom - 22) + 'px' });
+  }
+
+  unhide(id) {
+    const pos = this.draft.pages[this.page][id]; if (!pos) return;
+    pos.h = false; this.selected = id; this.apply(); this.message('Shown again.');
+  }
+
   action(op) {
-    if(op==='reset') { this.draft.pages[this.page]={}; this.apply(); this.message('Page reset. Click Save to keep.'); }
-    if(op==='all' && confirm('Reset layouts on all three pages?')) { this.draft=this.empty(); this.apply(); this.message('All reset. Click Save to keep.'); }
-    if(op==='save') {
-      try { const valid=this.validate(this.draft); localStorage.setItem(this.key,JSON.stringify(valid)); this.saved=valid; this.toast('Layouts saved on this browser'); this.finish(); }
-      catch(e) { this.message('Could not save: '+e.message); }
+    const page = this.page, id = this.selected, pos = id && this.draft.pages[page][id];
+    if (op === 'collapse') {
+      this.setCollapsed(!this.collapsed);
+      return;
     }
-    if(op==='cancel') { this.draft=JSON.parse(JSON.stringify(this.saved)); this.apply(); this.finish(); }
-    if(op==='import') this.panel.querySelector('input').click();
-    if(op==='export') {
-      const url=URL.createObjectURL(new Blob([JSON.stringify(this.draft,null,2)],{type:'application/json'}));
-      const a=document.createElement('a'); a.href=url; a.download='pocket-desktop-layouts.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
-      this.message('Exported current layout draft.');
+    if (op === 'bigger' || op === 'smaller') { if (pos) this.setScale(page, id, pos.s + (op === 'bigger' ? 0.1 : -0.1)); return; }
+    if (op === 'hide') {
+      if (!pos) return;
+      pos.h = !pos.h; this.apply();
+      this.message(pos.h ? 'Hidden. Use + in the Hidden list to show it again.' : 'Shown again.');
+      return;
+    }
+    if (op === 'reset') { this.draft.pages[page] = {}; this.selected = null; this.apply(); this.message('Page reset. Click Save to keep.'); }
+    if (op === 'all' && confirm('Reset layouts on all three pages?')) { this.draft = this.empty(); this.selected = null; this.apply(); this.message('All reset. Click Save to keep.'); }
+    if (op === 'save') {
+      try {
+        const valid = this.validate(this.draft);
+        localStorage.setItem(this.key, JSON.stringify(valid));
+        this.saved = valid; this.toast('Layouts saved on this browser'); this.finish();
+      } catch (e) { this.message('Could not save: ' + e.message, true); }
+    }
+    if (op === 'cancel') this.finish();
+    if (op === 'import') this.panel.querySelector('input').click();
+    if (op === 'export') {
+      const url = URL.createObjectURL(new Blob([JSON.stringify(this.draft, null, 2)], { type: 'application/json' }));
+      const a = document.createElement('a'); a.href = url; a.download = 'pocket-desktop-layouts.json'; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      this.message('Exported current layout draft.', true);
     }
   }
-  finish() { this.editing=false; this.drag=null; this.panel.hidden=true; Object.values(this.pages).forEach(r=>{r.classList.remove('layout-editing');r.querySelectorAll('[data-edit]').forEach(b=>b.setAttribute('aria-pressed','false'));}); }
+
+  finish() {
+    this.editing = false; this.drag = null; this.resizing = null; this.selected = null;
+    this.panel.hidden = true; this.handle.hidden = true;
+    Object.values(this.pages).forEach(r => {
+      r.classList.remove('layout-editing');
+      r.querySelectorAll('[data-edit]').forEach(b => b.setAttribute('aria-pressed', 'false'));
+    });
+    this.draft = clone(this.saved); this.apply();
+  }
 }
 
 export function bindMouseButton(el, button, send, signal) {
