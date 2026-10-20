@@ -366,9 +366,10 @@ for (const side of ['left','right']) $('#remote-'+side).addEventListener('click'
 });
 // Stable per-page IDs, independent of order or translated labels.
 const pageRoots={remote:$('#screen-remote'),pad:$('#screen-pad'),mouse:$('#screen-mouse')};
-const layoutSelectors={remote:['#remote-bar','#remote-dock','#remote-left','#remote-right'],pad:['#pad-move','#pad-look','#pad-dpad','.pad-face','.pad-system','#pad-click-left','#pad-click-right','#pad-motion-toggle','#pad-center','#pad-to-mouse','#pad-lt','#pad-rt','[data-pad-btn="lb"]','[data-pad-btn="rb"]']};
+const layoutSelectors={remote:['#remote-bar','#remote-dock','#remote-left','#remote-right'],pad:['#pad-move','#pad-look','#pad-dpad','.pad-face [data-pad-btn]','.pad-system [data-pad-btn]','#pad-click-left','#pad-click-right','#pad-motion-toggle','#pad-center','#pad-to-mouse','#pad-lt','#pad-rt','[data-pad-btn="lb"]','[data-pad-btn="rb"]']};
 for(const [page,selectors] of Object.entries(layoutSelectors)) for(const selector of selectors) {
-  const el=pageRoots[page].querySelector(selector); if(el) el.dataset.layout=el.id || el.dataset.padBtn || selector.replace(/[^a-z-]/g,'');
+  // Each button is its own layout item (A/B/X/Y, L3/R3/Guide/Select/Start all move separately).
+  for(const el of pageRoots[page].querySelectorAll(selector)) el.dataset.layout=el.id || el.dataset.padBtn || selector.replace(/[^a-z-]/g,'');
 }
 const layouts = new LayoutEditor(pageRoots,toast); window.pocketLayouts=layouts;
 $$('[data-edit]').forEach(el=>el.addEventListener('click',()=> {
