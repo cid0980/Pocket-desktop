@@ -522,7 +522,6 @@ code {
   justify-content: space-between;
   padding: 0 0.75rem;
   pointer-events: none;
-  z-index: 2;
 }
 .pad-triggers { top: calc(env(safe-area-inset-top, 0px) + 2.875rem); }
 .pad-shoulders { top: calc(env(safe-area-inset-top, 0px) + 6rem); }
@@ -597,7 +596,6 @@ code {
   position: absolute;
   left: 1rem;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 11.875rem);
-  z-index: 2;
 }
 .pad-dpad {
   position: relative;
@@ -627,7 +625,6 @@ code {
   right: calc(env(safe-area-inset-right, 0px) + 0.625rem);
   bottom: calc(env(safe-area-inset-bottom, 0px) + 9.375rem);
   width: 11.875rem; height: 11.875rem;
-  z-index: 2;
 }
 .pad-btn {
   position: absolute;
@@ -653,7 +650,6 @@ code {
   bottom: calc(env(safe-area-inset-bottom, 0px) + 6.75rem);
   display: flex;
   gap: 0.875rem;
-  z-index: 2;
 }
 
 .pad-mouse {
@@ -663,7 +659,6 @@ code {
   align-items: center;
   justify-content: space-between;
   gap: 0.625rem;
-  z-index: 2;
 }
 .pad-click {
   width: 5.25rem; height: 3.75rem;
