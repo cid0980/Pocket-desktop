@@ -168,6 +168,14 @@ const clampScale = (v) => Math.round(Math.max(MIN_SCALE, Math.min(MAX_SCALE, v))
  *   shape  optional: 'circle' | 'rounded' | 'pill' (absent = the control's own shape)
  * Version 1 ({x,y}) and version 2 ({x,y,s,h}) files are still accepted.
  */
+/**
+ * Keep every control clear of the phone's edge gestures (Android back/home swipes) and the bottom bar.
+ * Sides keep 1.25rem and the bottom keeps 1.5rem, so nothing sits where the system takes touches.
+ */
+function edgeMargins() {
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  return { x: 1.25 * rem, b: 1.5 * rem };
+}
 export class LayoutEditor {
   constructor(pages, toast) {
     this.pages = pages; this.toast = toast; this.key = 'pd-layouts-v1';
@@ -365,8 +373,9 @@ export class LayoutEditor {
     }
     for (const [id, r] of found) {
       const w = r.width, h = r.height, top = this.topInset(page, id);
-      const x = (r.left - 8) / Math.max(1, innerWidth - w - 16);
-      const y = (r.top - top) / Math.max(1, innerHeight - h - top - 8);
+      const edge = edgeMargins();
+      const x = (r.left - edge.x) / Math.max(1, innerWidth - w - 2 * edge.x);
+      const y = (r.top - top) / Math.max(1, innerHeight - h - top - edge.b);
       entries[id] = { x: Math.min(1, Math.max(0, x)), y: Math.min(1, Math.max(0, y)), sx: 1, sy: 1 };
     }
   }
@@ -518,13 +527,13 @@ export class LayoutEditor {
       for (const [id, el] of Object.entries(nodes)) {
         const pos = this.draft.pages[page][id]; const n = this.natural[page][id];
         if (!pos || !n) continue;
-        const { w, h } = this.size(page, id), top = this.topInset(page, id);
+        const { w, h } = this.size(page, id), top = this.topInset(page, id), edge = edgeMargins();
         // Size by real width and height (no transform), so the box you see is the box that receives touches.
         Object.assign(el.style, {
           position: 'fixed', right: 'auto', bottom: 'auto', margin: '0', zIndex: '12',
           width: w + 'px', height: h + 'px',
-          left: (8 + pos.x * Math.max(0, innerWidth - w - 16)) + 'px',
-          top: (top + pos.y * Math.max(0, innerHeight - h - top - 8)) + 'px',
+          left: (edge.x + pos.x * Math.max(0, innerWidth - w - 2 * edge.x)) + 'px',
+          top: (top + pos.y * Math.max(0, innerHeight - h - top - edge.b)) + 'px',
         });
         if (pos.shape) el.style.borderRadius = SHAPE_RADIUS[pos.shape];
         if (pos.h) {
