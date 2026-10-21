@@ -52,6 +52,8 @@ class Stick {
     listen(zone, 'pointerup', (e) => this.up(e));
     listen(zone, 'pointercancel', (e) => this.up(e));
     listen(zone, 'pointerleave', (e) => this.up(e));
+    // The system can take a touch away (notification pull-down, edge swipe). Let go then, or the stick sticks.
+    listen(zone, 'lostpointercapture', (e) => this.up(e));
   }
 
   down(e) {
@@ -59,8 +61,8 @@ class Stick {
     this.active = true;
     this.pointerId = e.pointerId;
     const rect = this.zone.getBoundingClientRect();
-    // The stick's reach follows the zone's size, so a small or large custom zone still gives full range.
-    this.radius = Math.max(28, Math.min(rect.width, rect.height) * 0.4);
+    // Reach scales with the zone (a bigger zone gives a longer throw) but never drops below a comfortable thumb reach.
+    this.radius = Math.max(44, Math.min(rect.width, rect.height) * 0.42);
     this.originX = e.clientX;
     this.originY = e.clientY;
     this.knob.style.left = `${e.clientX - rect.left}px`;
@@ -75,12 +77,15 @@ class Stick {
     const dx = e.clientX - this.originX;
     const dy = e.clientY - this.originY;
     const dist = Math.hypot(dx, dy);
-    const clamped = Math.min(dist, this.radius) || 0;
+    // A small dead zone in pixels stops finger jitter from becoming movement; the rest maps linearly to the full reach.
+    const dead = Math.min(8, this.radius * 0.15);
     const angle = Math.atan2(dy, dx);
+    const clamped = Math.min(dist, this.radius);
     const kx = Math.cos(angle) * clamped;
     const ky = Math.sin(angle) * clamped;
-    this.x = clamped ? (Math.cos(angle) * (clamped / this.radius)) : 0;
-    this.y = clamped ? (Math.sin(angle) * (clamped / this.radius)) : 0;
+    const mag = dist <= dead ? 0 : Math.min(1, (dist - dead) / (this.radius - dead));
+    this.x = mag ? Math.cos(angle) * mag : 0;
+    this.y = mag ? Math.sin(angle) * mag : 0;
     this.knob.style.setProperty('--kx', `${kx}px`);
     this.knob.style.setProperty('--ky', `${ky}px`);
     this.onChange(this.x, this.y);
@@ -241,7 +246,8 @@ class GamepadScreen {
       listen(el, 'pointerdown', e => {
         if (pointer !== null) return;
         pointer = e.pointerId; startY = e.clientY;
-        el.setPointerCapture(e.pointerId); el.classList.add('down');
+        try { el.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+        el.classList.add('down');
         this.setTrigger(axis, e.pointerType === 'pen' && e.pressure > 0 ? e.pressure : 1);
         e.preventDefault();
       });

@@ -402,7 +402,7 @@ document.addEventListener('pd:open',e=>{
   releaseWorkspaceInputs();
   mouseAbort?.abort();mouseMotion?.stop();mouseMotion=null;
   if(target==='pad') openPad();
-  else if(target==='mouse') openMouse('home');
+  else if(target==='mouse'){ openMouse('home'); window.dispatchEvent(new Event('resize')); } /* re-place the Menu away from the SCROLL strip */
   else if(target==='keyboard') openKeyboard('home');
 });
 document.addEventListener('pd:customize',()=>{

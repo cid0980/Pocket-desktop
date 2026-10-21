@@ -44,8 +44,15 @@ function immersiveMenu() {
       placeMenu(wrap.getBoundingClientRect().left, wrap.getBoundingClientRect().top);
     });
     function placeMenu(x, y, save) {
-      const x2 = Math.max(0, Math.min(x, innerWidth - wrap.offsetWidth));
-      const y2 = Math.max(0, Math.min(y, innerHeight - wrap.offsetHeight));
+      let x2 = Math.max(0, Math.min(x, innerWidth - wrap.offsetWidth));
+      let y2 = Math.max(0, Math.min(y, innerHeight - wrap.offsetHeight));
+      // Never sit on the mouse page's SCROLL strip: move the Menu to the left edge if they would overlap.
+      const strip = document.getElementById('mouse-scroll')?.getBoundingClientRect();
+      if (strip && strip.width > 0 && !wrap.hidden) {
+        const overlaps = x2 < strip.right && x2 + wrap.offsetWidth > strip.left
+          && y2 < strip.bottom && y2 + wrap.offsetHeight > strip.top;
+        if (overlaps) x2 = Math.max(0, strip.left - wrap.offsetWidth - 4) >= 0 ? Math.max(0, strip.left - wrap.offsetWidth - 4) : 0;
+      }
       Object.assign(wrap.style, { left: x2 + 'px', top: y2 + 'px', right: 'auto' });
       if (save) { try { localStorage.setItem('pd-immersive-menu-pos', JSON.stringify({ x: x2, y: y2 })); } catch {} }
     }
@@ -88,6 +95,7 @@ export function toggleImmersive() {
   const on = !isImmersive();
   document.body.classList.toggle('pd-immersive', on);
   immersiveMenu().hidden = !on;
+  window.dispatchEvent(new Event('resize')); // re-place the Menu away from the SCROLL strip
   document.querySelectorAll('[data-fullscreen]').forEach(b => {
     if (!b.hasAttribute('data-compact')) b.textContent = on ? 'Exit fullscreen' : 'Fullscreen';
     b.setAttribute('aria-label', on ? 'Exit fullscreen' : 'Fullscreen');
@@ -154,7 +162,7 @@ export class MotionPointer {
 
 const MIN_SCALE = 0.5, MAX_SCALE = 2.5;
 const SHAPES = ['circle', 'rounded', 'pill'];
-const SHAPE_RADIUS = { circle: '50%', rounded: '16px', pill: '999px' };
+const SHAPE_RADIUS = { circle: '50%', rounded: '1rem', pill: '50rem' };
 const clone = (v) => JSON.parse(JSON.stringify(v));
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const clampScale = (v) => Math.round(Math.max(MIN_SCALE, Math.min(MAX_SCALE, v)) * 100) / 100;
@@ -182,6 +190,8 @@ export class LayoutEditor {
     this.saved = this.empty(); this.nodes = {}; this.natural = {};
     this.editing = false; this.page = null; this.selected = null; this.collapsed = true;
     this.drag = null; this.resizing = null;
+    // Keep width and height in proportion (on by default). Stored on this browser.
+    this.lockRatio = localStorage.getItem('pd-layout-lock') !== '0';
 
     for (const [page, root] of Object.entries(pages)) {
       this.nodes[page] = {}; this.natural[page] = {};
@@ -238,6 +248,12 @@ export class LayoutEditor {
           </select>
           <button type="button" data-op="hide" disabled>Hide</button>
         </div>
+        <div class="le-row">
+          <label class="le-num"><input type="checkbox" data-op="lock"> Keep shape (W and H together)</label>
+          <select data-op="match" disabled aria-label="Match size and shape to another control">
+            <option value="">Match size &amp; shape to…</option>
+          </select>
+        </div>
         <div class="le-row" data-hidden-list hidden></div>
         <div class="le-main">
           <button type="button" data-op="reset">Reset page</button>
@@ -263,13 +279,21 @@ export class LayoutEditor {
     });
     this.panel.addEventListener('change', e => {
       const op = e.target.dataset.op;
+      if (op === 'lock') {
+        this.lockRatio = e.target.checked;
+        try { localStorage.setItem('pd-layout-lock', this.lockRatio ? '1' : '0'); } catch {}
+        this.message(this.lockRatio ? 'Width and height now change together.' : 'Width and height change separately.');
+        return;
+      }
+      if (op === 'match') { this.matchTo(e.target.value); e.target.value = ''; return; }
       if (op === 'shape') this.setShape(this.page, this.selected, e.target.value);
       if ((op === 'w' || op === 'h') && this.selected && this.draft.pages[this.page][this.selected]) {
         const v = Number(e.target.value);
         if (!Number.isFinite(v) || v <= 0) { this.renderTools(); return; }
         const cur = this.draft.pages[this.page][this.selected];
-        if (op === 'w') this.setSize(this.page, this.selected, v / 100, cur.sy);
-        else this.setSize(this.page, this.selected, cur.sx, v / 100);
+        const ratio = cur.sy / cur.sx;
+        if (op === 'w') this.setSize(this.page, this.selected, v / 100, this.lockRatio ? (v / 100) * ratio : cur.sy);
+        else this.setSize(this.page, this.selected, this.lockRatio ? (v / 100) / ratio : cur.sx, v / 100);
       }
     });
     this.panel.querySelector('input[type="file"]').addEventListener('change', async e => {
@@ -302,7 +326,8 @@ export class LayoutEditor {
     this.handle.addEventListener('pointermove', e => {
       const z = this.resizing; if (!z || e.pointerId !== z.pointer) return;
       e.preventDefault(); e.stopPropagation();
-      const fx = Math.max(0.05, e.clientX - z.left) / z.dx, fy = Math.max(0.05, e.clientY - z.top) / z.dy;
+      let fx = Math.max(0.05, e.clientX - z.left) / z.dx, fy = Math.max(0.05, e.clientY - z.top) / z.dy;
+      if (this.lockRatio) fx = fy = (fx + fy) / 2;
       this.setSize(z.page, z.id, z.sx * fx, z.sy * fy);
     });
     const endResize = e => {
@@ -503,6 +528,39 @@ export class LayoutEditor {
     this.apply(); this.message(shape ? `Shape: ${shape}` : 'Shape: default');
   }
 
+  /** Give the selected control the same on-screen width, height and shape as another control on this page. */
+  matchTo(otherId) {
+    const page = this.page, id = this.selected;
+    if (!otherId || !id || otherId === id || !this.draft.pages[page][otherId]) return;
+    const target = this.size(page, otherId), n = this.natural[page][id];
+    if (!n) return;
+    const sx = target.w / n.w, sy = target.h / n.h;
+    const ok = sx >= MIN_SCALE && sx <= MAX_SCALE && sy >= MIN_SCALE && sy <= MAX_SCALE;
+    this.setSize(page, id, sx, sy);
+    const other = this.draft.pages[page][otherId], cur = this.draft.pages[page][id];
+    if (other.shape) cur.shape = other.shape; else delete cur.shape;
+    this.apply();
+    this.message(ok
+      ? `Matched ${this.labelOf(page, otherId)}: ${Math.round(cur.sx * 100)}% × ${Math.round(cur.sy * 100)}%`
+      : 'Matched as far as the size limits allow (50%–250%).');
+  }
+
+  /** Labels of visible controls that overlap the selected one on screen. */
+  overlapsOf(page, id) {
+    const el = this.nodes[page][id]; if (!el || el.classList.contains('layout-hidden')) return [];
+    const a = el.getBoundingClientRect(); if (!a.width) return [];
+    const out = [];
+    for (const [oid, other] of Object.entries(this.nodes[page])) {
+      if (oid === id || other.classList.contains('layout-hidden') || this.draft.pages[page][oid]?.h) continue;
+      const b = other.getBoundingClientRect();
+      if (!b.width) continue;
+      const w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+      const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+      if (w > 4 && h > 4) out.push(this.labelOf(page, oid));
+    }
+    return out;
+  }
+
   select(id) { this.selected = id; this.apply(); }
 
   labelOf(page, id) {
@@ -549,9 +607,18 @@ export class LayoutEditor {
     if (!this.editing) return;
     const page = this.page, id = this.selected, pos = id && this.draft.pages[page][id];
     const sel = this.panel.querySelector('[data-sel]');
+    const overlaps = pos ? this.overlapsOf(page, id) : [];
     sel.textContent = pos
       ? `${this.labelOf(page, id)}${pos.h ? ' (hidden)' : ''} · ${Math.round(pos.sx * 100)}%×${Math.round(pos.sy * 100)}%`
+        + (overlaps.length ? ` · overlaps ${overlaps.join(', ')}` : '')
       : 'Tap a control to select it';
+    this.panel.querySelector('[data-op="lock"]').checked = this.lockRatio;
+    const match = this.panel.querySelector('[data-op="match"]');
+    match.disabled = !pos;
+    if (document.activeElement !== match) {
+      const others = pos ? Object.keys(this.draft.pages[page]).filter(k => k !== id && this.nodes[page][k] && !this.draft.pages[page][k].h) : [];
+      match.replaceChildren(new Option('Match size & shape to…', ''), ...others.map(k => new Option(this.labelOf(page, k), k)));
+    }
     for (const op of ['smaller', 'bigger', 'hide']) this.panel.querySelector(`[data-op="${op}"]`).disabled = !pos;
     const shapeSel = this.panel.querySelector('[data-op="shape"]');
     shapeSel.disabled = !pos; shapeSel.value = pos?.shape || '';

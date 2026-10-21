@@ -129,6 +129,15 @@ function sessionFor(req, url) {
     || auth.verifyToken(url?.searchParams?.get('t') || null);
 }
 
+/** Origins the app accepts from a browser: this host, the platform preview, and the opaque origin of a sandboxed frame. */
+function originAllowed(req) {
+  const origin = req.headers.origin;
+  if (!origin) return true;
+  if (origin === 'null') return true;
+  if (origin === `http://${req.headers.host}` || origin === `https://${req.headers.host}`) return true;
+  return /^https:\/\/[a-z0-9-]+\.e2b\.app$/i.test(origin);
+}
+
 /** CORS for the platform preview iframe (opaque origin) — narrow on purpose. */
 function applyCors(req, res) {
   const origin = req.headers.origin;
@@ -972,6 +981,15 @@ function buildServer() {
 
   server.on('upgrade', (req, socket, head) => {
     const url = new URL(req.url, 'http://localhost');
+    // Cross-site pages must not open the control sockets with the user's cookie (defence in depth
+    // on top of SameSite=Strict). Same host, the platform preview, sandboxed iframes ('null') and
+    // non-browser clients (no Origin) are still allowed.
+    if (!originAllowed(req)) {
+      log.warn('ws: rejected cross-origin upgrade', { path: url.pathname, origin: req.headers.origin });
+      socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+      socket.destroy();
+      return;
+    }
     if (url.pathname !== '/ws' && url.pathname !== '/wsctl') {
       log.warn('ws: upgrade to unknown path', { path: url.pathname });
       socket.write('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n');
