@@ -78,7 +78,9 @@ REL_X, REL_Y, REL_WHEEL = 0x00, 0x01, 0x08
 BUS_USB = 0x03
 
 PAD_BUTTONS = {
-    'a': BTN_A, 'b': BTN_B, 'x': BTN_X, 'y': BTN_Y,
+    'a': BTN_A, 'b': BTN_B,
+    # Preserve the app's X/Y face-button actions on the virtual Xbox controller.
+    'x': BTN_Y, 'y': BTN_X,
     'lb': BTN_TL, 'rb': BTN_TR, 'lt': BTN_TL2, 'rt': BTN_TR2,
     'back': BTN_SELECT, 'start': BTN_START, 'guide': BTN_MODE,
     'ls': BTN_THUMBL, 'rs': BTN_THUMBR,

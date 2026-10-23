@@ -192,7 +192,7 @@ function decodeEvents(buf) {
         check(axis+' releases to zero',decodeEvents(drain(padFd)).some(e=>e.type===3&&e.code===code&&e.value===0));
       }
 
-      for (const [name,code] of Object.entries({b:0x131,x:0x133,y:0x134,lb:0x136,rb:0x137,back:0x13a,start:0x13b,guide:0x13c,ls:0x13d,rs:0x13e})) {
+      for (const [name,code] of Object.entries({b:0x131,x:0x134,y:0x133,lb:0x136,rb:0x137,back:0x13a,start:0x13b,guide:0x13c,ls:0x13d,rs:0x13e})) {
         const pt=await cdpLib.evaluate(cdp,sessionId,`(()=>{const r=document.querySelector('[data-pad-btn="${name}"]').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()`);
         drain(padFd); await cdpLib.sendTouch(cdp,sessionId,'touchStart',[pt]); await cdpLib.sleep(60);
         check(name+' press reaches kernel',decodeEvents(drain(padFd)).some(e=>e.type===1&&e.code===code&&e.value===1));
